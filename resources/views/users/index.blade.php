@@ -294,6 +294,37 @@
     <script>
         const roleLabels = { admin: 'Admin', manager: 'Menecer', user: 'İstifadəçi', executor: 'İcraçı' };
 
+        document.addEventListener('DOMContentLoaded', function () {
+            var $cm = $('#createModal');
+            $cm.find('select').each(function () {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $cm.find('.modal-body'), placeholder: 'Seç', allowClear: true, width: '100%' });
+            });
+
+            $(document).on('change', 'select[name="executor_id"]', function () {
+                var $opt = $(this).find(':selected');
+                var $form = $(this).closest('form');
+                var executorId = $(this).val();
+                if (!executorId) return;
+
+                var prefix = $form.attr('id') === 'editForm' ? 'edit' : 'create';
+                if (prefix === 'edit') {
+                    var deptId = null;
+                    var select = document.getElementById('edit_executor_id');
+                    var execData = select._execData || [];
+                    execData.forEach(function (e) {
+                        if (e.id == executorId && e.department) deptId = e.department.id;
+                    });
+                    if (deptId) $('#edit_department_id').val(deptId).trigger('change');
+                } else {
+                    @json($executors).forEach(function (e) {
+                        if (e.id == executorId && e.department) {
+                            $form.find('select[name="department_id"]').val(e.department.id).trigger('change');
+                        }
+                    });
+                }
+            });
+        });
+
         function toggleExecutorFields(prefix) {
             var role = document.getElementById(prefix + '_user_role').value;
             var fields = document.querySelectorAll('.executor-fields-' + prefix);
@@ -355,7 +386,15 @@
                 });
             }
 
+            document.getElementById('edit_executor_id')._execData = data.executors || [];
             toggleExecutorFields('edit');
+
+            var $em = $('#editModal');
+            $em.find('select').each(function () {
+                if ($(this).data('select2')) $(this).select2('destroy');
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $em.find('.modal-body'), placeholder: 'Seç', allowClear: true, width: '100%' });
+            });
+            
             document.getElementById('editForm').action = `/users/${id}`;
             new bootstrap.Modal(document.getElementById('editModal')).show();
         }

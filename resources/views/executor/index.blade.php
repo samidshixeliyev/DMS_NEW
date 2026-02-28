@@ -279,7 +279,7 @@
 @endsection
 
 @push('scripts')
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="../../js/mammoth.browser.min.js"></script>
     <script src="{{ asset('js/document-preview.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {

@@ -6,11 +6,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>DMS — Giriş</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <link href="../../fonts.css" rel="stylesheet">
+    <link href="../../lib/bs5/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../../lib/bs5/bootstrap-icons.css">
 
     <style>
         * { font-family: 'Plus Jakarta Sans', sans-serif; }

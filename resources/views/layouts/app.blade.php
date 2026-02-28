@@ -7,23 +7,20 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'DMS Tətbiqi')</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link rel="stylesheet" href=".././fonts.css">
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.3.0/css/fixedColumns.bootstrap5.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href=".././lib/bs5/bootstrap.min.css">
+    <link rel="stylesheet" href=".././lib/bs5/bootstrap-icons.css">
+    <link rel="stylesheet" href=".././lib/bs5/buttons.bootstrap5.min.css">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
+    <link rel="stylesheet" href=".././lib/datatables/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href=".././lib/datatables/fixedColumns.bootstrap5.min.css">
+
+    <link rel="stylesheet" href=".././lib/select2/select2.min.css">
+    <link rel="stylesheet" href=".././lib/select2/select2-bootstrap-5-theme.min.css">
+    <link rel="stylesheet" href=".././lib/flatpickr/flatpickr.min.css">
+
+    <!-- <script>
         tailwind.config = {
             corePlugins: {
                 preflight: false
@@ -41,7 +38,7 @@
                 }
             }
         }
-    </script>
+    </script> -->
 
     <style>
         :root {
@@ -308,11 +305,14 @@
             border-radius: var(--radius-sm);
             min-height: 38px;
             font-size: 0.875rem;
+        }
+
+        .select2-container--bootstrap-5 .select2-selection--single {
             display: flex !important;
             align-items: center !important;
         }
 
-        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        .select2-selection__rendered {
             line-height: normal !important;
             padding-left: 0.75rem;
         }
@@ -518,7 +518,7 @@
             inset: 0;
             opacity: 0.03;
             pointer-events: none;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            background-image: url("../../noise.svg");
         }
 
         #sidebarOverlay {
@@ -782,17 +782,20 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://cdn.datatables.net/fixedcolumns/4.3.0/js/dataTables.fixedColumns.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/az.js"></script>
+    <script src="../../js/jquery-3.7.1.min.js"></script>
+    <script src="../../lib/bs5/bootstrap.bundle.min.js"></script>
+
+    <script src="../../lib/datatables/jquery.dataTables.min.js"></script>
+    <script src="../../lib/datatables/dataTables.bootstrap5.min.js"></script>
+    <script src="../../lib/datatables/dataTables.buttons.min.js"></script>
+    <script src="../../lib/datatables/dataTables.fixedColumns.min.js"></script>
+    <script src="../../lib/bs5/buttons.bootstrap5.min.js"></script>
+    <script src="../../lib/datatables/buttons.colVis.min.js"></script>
+
+
+    <script src="../../lib/select2/select2.min.js"></script>
+    <script src="../../lib/flatpickr/flatpickr.min.js"></script>
+    <script src="../../lib/flatpickr/flatpickr_az.js"></script>
 
     <script>
         const sidebar = document.getElementById('sidebar');
