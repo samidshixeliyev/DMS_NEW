@@ -124,9 +124,7 @@ class LegalActController extends Controller
             foreach ($act->statusLogs as $log) {
                 if ($log->user && $log->user->executor_id) {
                     $exId = $log->user->executor_id;
-                    if (!isset($executorLogMap[$exId])) {
-                        $executorLogMap[$exId] = $log;
-                    }
+                    $executorLogMap[$exId] = $log;
                 }
             }
 
@@ -201,8 +199,15 @@ class LegalActController extends Controller
                 }
             }
 
-            $latestLog = $act->latestStatusLog;
-            $isPending = $latestLog?->approval_status === ExecutorStatusLog::APPROVAL_PENDING;
+            $pendingLogId = null;
+            if ($anyPending) {
+                foreach ($executorLogMap as $log) {
+                    if ($log->approval_status === ExecutorStatusLog::APPROVAL_PENDING) {
+                        $pendingLogId = $log->id;
+                        break;
+                    }
+                }
+            }
 
             $data[] = [
                 'DT_RowClass' => $rowClass,
@@ -225,7 +230,7 @@ class LegalActController extends Controller
                 'canEdit' => ($userId === $act->inserted_user_id) || $canManage,
                 'canDelete' => $isAdmin,
                 'hasPendingApproval' => $anyPending,
-                'pendingLogId' => $isPending ? $latestLog?->id : null,
+                'pendingLogId' => $pendingLogId,
             ];
         }
 
@@ -296,7 +301,7 @@ class LegalActController extends Controller
             'issuingAuthority',
             'executors.department',
             'latestStatusLog.executionNote',
-            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser']),
+            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser'])->reorder('created_at', 'asc'),
             'executors.users',
             'attachments.user',
             'insertedUser',
@@ -313,11 +318,13 @@ class LegalActController extends Controller
             'summary' => $legalAct->summary,
             'issuing_authority' => $legalAct->issuingAuthority?->name,
             'main_executors' => $mainExecutors->map(fn($e) => [
+                'id' => $e->id,
                 'name' => $e->name,
                 'position' => $e->position,
                 'department' => $e->department?->name,
             ]),
             'helper_executors' => $helperExecutors->map(fn($e) => [
+                'id' => $e->id,
                 'name' => $e->name,
                 'position' => $e->position,
                 'department' => $e->department?->name,
@@ -332,6 +339,7 @@ class LegalActController extends Controller
             'created_at' => $legalAct->created_at?->format('d.m.Y H:i'),
             'status_logs' => $legalAct->statusLogs->map(fn($log) => [
                 'user' => $log->user?->full_name,
+                'executor_id' => $log->user?->executor_id,
                 'note' => $log->executionNote?->note,
                 'custom_note' => $log->custom_note,
                 'date' => $log->created_at?->format('d.m.Y H:i'),
@@ -465,7 +473,7 @@ class LegalActController extends Controller
             'executors.department',
             'latestStatusLog.executionNote',
             'latestStatusLog.approvedByUser',
-            'statusLogs' => fn($q) => $q->with('executionNote', 'user'),
+            'statusLogs' => fn($q) => $q->with('executionNote', 'user')->reorder('created_at', 'asc'),
             'executors.users',
             'insertedUser',
         ])->active();

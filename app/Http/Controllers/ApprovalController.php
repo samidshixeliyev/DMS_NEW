@@ -13,7 +13,7 @@ class ApprovalController extends Controller
     private function getIcraOlunubNoteIds(): array
     {
         return ExecutionNote::all()
-            ->filter(fn($n) => mb_stripos($n->note, 'İcra olunub') !== false || mb_stripos($n->note, 'icra olunub') !== false || mb_stripos($n->note, 'ICRA OLUNUB') !== false)
+            ->filter(fn($n) => mb_stripos(mb_strtolower($n->note, 'UTF-8'), mb_strtolower('icra olunub', 'UTF-8')) !== false)
             ->pluck('id')->toArray();
     }
 

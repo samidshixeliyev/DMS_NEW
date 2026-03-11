@@ -707,17 +707,19 @@
                 (list || []).forEach(function (e) {
                     var dept = e.department || 'Təyin olunmayıb';
                     if (!deptMap[dept]) deptMap[dept] = { executors: [], key: 'showDept' + Object.keys(deptMap).length };
-                    deptMap[dept].executors.push({ name: e.name, position: e.position, role: role });
+                    deptMap[dept].executors.push({ id: e.id, name: e.name, position: e.position, role: role });
                 });
             }
             groupByDept(data.main_executors, 'Əsas');
             groupByDept(data.helper_executors, 'Digər');
 
-            var logsByUser = {};
+            var logsByExec = {};
             (data.status_logs || []).forEach(function (log) {
-                var u = log.user || 'Naməlum';
-                if (!logsByUser[u]) logsByUser[u] = [];
-                logsByUser[u].push(log);
+                var exId = log.executor_id;
+                if (exId) {
+                    if (!logsByExec[exId]) logsByExec[exId] = [];
+                    logsByExec[exId].push(log);
+                }
             });
 
             var deptKeys = Object.keys(deptMap);
@@ -726,7 +728,7 @@
             if (deptKeys.length === 0) {
                 rightHtml = '<p class="text-muted fst-italic">Hələ status dəyişikliyi yoxdur.</p>';
             } else if (deptKeys.length === 1) {
-                rightHtml = buildDeptContent(deptMap[deptKeys[0]].executors, logsByUser);
+                rightHtml = buildDeptContent(deptMap[deptKeys[0]].executors, logsByExec)
             } else {
                 var tabs = '<ul class="nav nav-pills mb-3" style="gap:4px">';
                 var panes = '<div class="tab-content">';
@@ -738,7 +740,7 @@
                         + escapeHtml(dept) + ' <span class="badge bg-white text-dark ms-1" style="font-size:0.6rem">' + d.executors.length + '</span>'
                         + '</a></li>';
                     panes += '<div class="tab-pane fade' + (active ? ' show active' : '') + '" id="' + d.key + '">'
-                        + buildDeptContent(d.executors, logsByUser)
+                        + buildDeptContent(d.executors, logsByExec)
                         + '</div>';
                 });
                 tabs += '</ul>';
@@ -750,7 +752,7 @@
                 var h = '';
                 executors.forEach(function (ex, ei) {
                     if (ei > 0) h += '<hr class="my-2" style="opacity:0.15">';
-                    var userLogs = logsByUser[ex.name] || [];
+                    var userLogs = logsByExec[ex.id] || [];
                     var roleBadge = ex.role === 'Əsas'
                         ? '<span class="badge bg-success" style="font-size:0.6rem">Əsas</span>'
                         : '<span class="badge bg-secondary" style="font-size:0.6rem">Digər</span>';

@@ -189,6 +189,26 @@
                 class="btn-close" data-bs-dismiss="alert"></button>
     </div>@endif
 
+    @if(auth()->user()->canManage() && $allExecutors->isNotEmpty())
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <div class="row align-items-center">
+                    <div class="col-auto"><strong><i class="bi bi-person-lines-fill me-1"></i> İcraçı seçin:</strong></div>
+                    <div class="col-md-4">
+                        <select id="viewAsExecutor" class="form-select">
+                            <option value="">Hamısı (ümumi baxış)</option>
+                            @foreach($allExecutors as $ex)
+                                <option value="{{ $ex->id }}">
+                                    {{ $ex->name }}{{ $ex->department ? ' — ' . $ex->department->name : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-body p-0">
             <div style="overflow-x:auto;">
@@ -276,6 +296,16 @@
 
     {{-- Preview Modal (shared partial) --}}
     @include('partials.preview-modal')
+
+    <div id="uploadOverlay"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+        <div
+            style="background:#fff;border-radius:12px;padding:2rem 3rem;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;"></div>
+            <div class="fw-bold" style="font-size:1.1rem;">Yüklənir...</div>
+            <div class="text-muted" style="font-size:0.85rem;">Zəhmət olmasa gözləyin</div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -284,10 +314,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
 
+            $('#viewAsExecutor').select2({ theme: 'bootstrap-5', placeholder: 'İcraçı seçin...', allowClear: true, width: '100%' });
+            $('#viewAsExecutor').on('change', function () { table.ajax.reload(); });
             // ─── DataTable ──────────────────────────────────────────────
             var table = $('#executorTable').DataTable({
                 processing: true, serverSide: true,
-                ajax: { url: "{{ route('executor.load') }}", type: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken } },
+                ajax: { url: "{{ route('executor.load') }}", type: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken }, data: function (d) { var ex = $('#viewAsExecutor').val(); if (ex) d.view_as_executor_id = ex; } },
                 columns: [
                     { data: 'rowNum', className: 'text-center', orderable: false },
                     { data: 'actType', className: 'text-center', render: function (d) { return (!d || d === '-') ? '-' : '<span class="badge" style="background:var(--accent-dark,#1e3a5f)">' + escapeHtml(d) + '</span>'; } },
@@ -314,7 +346,18 @@
                 ],
                 order: [[3, 'desc']], pageLength: 25, lengthMenu: [10, 25, 50, 100],
                 dom: '<"d-flex justify-content-between align-items-center flex-wrap px-3 pt-2"l>rt<"d-flex justify-content-between align-items-center flex-wrap px-3 pb-2"ip>',
-                language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "Sizə təyin olunmuş sənəd yoxdur", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı" }
+                language: {
+                    paginate: {
+                        previous: "&laquo;",
+                        next: "&raquo;"
+                    },
+                    emptyTable: "{{ auth()->user()->canManage() ? 'İcraçı seçin' : 'Sizə təyin olunmuş sənəd yoxdur' }}",
+                    info: "_START_-_END_ / _TOTAL_",
+                    infoEmpty: "Məlumat yoxdur",
+                    lengthMenu: "_MENU_ nəticə",
+                    processing: "Yüklənir...",
+                    zeroRecords: "Tapılmadı"
+                }
             });
 
             // ─── Attachment warning toggle ──────────────────────────────
@@ -398,6 +441,10 @@
                 selectedFiles = new DataTransfer();
                 attachmentsInput.files = selectedFiles.files;
                 fileListEl.innerHTML = '';
+            });
+
+            document.getElementById('statusForm').addEventListener('submit', function () {
+                document.getElementById('uploadOverlay').style.display = 'flex';
             });
 
             // Make selectedFiles accessible for changeStatus reset

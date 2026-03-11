@@ -36,32 +36,51 @@ class ExecutorDashboardController extends Controller
     public function index()
     {
         $user = auth()->user();
-        if (!$user->executor_id && !$user->canManage()) abort(403, 'Sizin icraçı profiliniz yoxdur.');
+        if (!$user->executor_id && !$user->canManage())
+            abort(403, 'Sizin icraçı profiliniz yoxdur.');
         $executionNotes = ExecutionNote::active()->get();
-        return view('executor.index', compact('executionNotes'));
+        $allExecutors = $user->canManage() ? \App\Models\Executor::with('department')->active()->get() : collect();
+        return view('executor.index', compact('executionNotes', 'allExecutors'));
     }
 
     public function load(Request $request)
     {
-        $user       = auth()->user();
+        $user = auth()->user();
         $executorId = $user->executor_id;
+
         if (!$executorId && !$user->canManage()) {
             return response()->json(['draw' => 1, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
         }
 
-        $draw   = $request->input('draw', 1);
-        $start  = $request->input('start', 0);
+        if ($user->canManage() && $request->filled('view_as_executor_id')) {
+            $executorId = (int) $request->input('view_as_executor_id');
+        }
+
+        if (!$executorId) {
+            return response()->json(['draw' => (int) $request->input('draw', 1), 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
+        }
+
+        $draw = $request->input('draw', 1);
+        $start = $request->input('start', 0);
         $length = $request->input('length', 25);
 
-        $baseQuery    = LegalAct::active()->whereHas('executors', fn($q) => $q->where('executors.id', $executorId));
+        $baseQuery = LegalAct::active();
+        if ($executorId) {
+            $baseQuery->whereHas('executors', fn($q) => $q->where('executors.id', $executorId));
+        }
         $totalRecords = (clone $baseQuery)->count();
 
         $query = LegalAct::with([
-            'actType', 'issuingAuthority', 'executors.department',
-            'latestStatusLog.executionNote', 'latestStatusLog.approvedByUser',
-            'statusLogs.executionNote', 'statusLogs.approvedByUser', 'insertedUser',
-        ])->active()->whereHas('executors', fn($q) => $q->where('executors.id', $executorId));
+            'actType',
+            'issuingAuthority',
+            'executors.department',
+            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser'])->reorder('created_at', 'asc'),
+            'insertedUser',
+        ])->active();
 
+        if ($executorId) {
+            $query->whereHas('executors', fn($q) => $q->where('executors.id', $executorId));
+        }
         if ($request->filled('col.legal_act_number')) {
             foreach (preg_split('/\s+/', trim($request->input('col.legal_act_number'))) as $term) {
                 $query->where('legal_act_number', 'like', '%' . $term . '%');
@@ -85,21 +104,21 @@ class ExecutorDashboardController extends Controller
 
         $results = $query->skip($start)->take($length)->get();
         $data = [];
-
+        $viewUserIds = [$user->id];
+        if ($user->canManage() && $executorId && $executorId !== $user->executor_id) {
+            $viewUserIds = \App\Models\User::where('executor_id', $executorId)->pluck('id')->toArray();
+        }
         foreach ($results as $i => $act) {
-            $latestLog   = $act->latestStatusLog;
-            $myLatestLog = $act->statusLogs->where('user_id', $user->id)->sortByDesc('id')->first();
+            $myLatestLog = $act->statusLogs->whereIn('user_id', $viewUserIds)->sortByDesc('id')->first();
+            $noteText = $myLatestLog?->executionNote?->note ?? '';
 
-            $isIcraOlunub   = $latestLog && $this->isIcraOlunubNote($latestLog->execution_note_id);
             $myIsIcraOlunub = $myLatestLog && $this->isIcraOlunubNote($myLatestLog->execution_note_id);
-            $noteText       = $myLatestLog?->executionNote?->note ?? '';
-
-            $isExecuted  = $isIcraOlunub && $latestLog->approval_status === 'approved';
-            $isPending   = $isIcraOlunub && $latestLog->approval_status === 'pending';
-
             $myIsExecuted = $myIsIcraOlunub && $myLatestLog->approval_status === 'approved';
-            $myIsPending  = $myIsIcraOlunub && in_array($myLatestLog->approval_status, ['pending', 'partial']);
+            $myIsPending = $myIsIcraOlunub && in_array($myLatestLog->approval_status, ['pending', 'partial']);
             $myIsRejected = $myIsIcraOlunub && $myLatestLog->approval_status === 'rejected';
+
+            $isExecuted = $myIsExecuted;
+            $isPending = $myIsPending;
 
             $daysLeft = null;
             $rowClass = '';
@@ -116,8 +135,10 @@ class ExecutorDashboardController extends Controller
             if ($act->execution_deadline) {
                 $deadlineHtml = $act->execution_deadline->format('d.m.Y');
                 if (!$isExecuted && !$isPending && $daysLeft !== null) {
-                    if ($daysLeft < 0)      $deadlineHtml .= '<br><span class="badge bg-danger text-white mt-1">İcra müddəti bitib</span>';
-                    elseif ($daysLeft <= 3) $deadlineHtml .= '<br><span class="badge bg-warning text-dark mt-1">' . $daysLeft . ' gün qalıb</span>';
+                    if ($daysLeft < 0)
+                        $deadlineHtml .= '<br><span class="badge bg-danger text-white mt-1">İcra müddəti bitib</span>';
+                    elseif ($daysLeft <= 3)
+                        $deadlineHtml .= '<br><span class="badge bg-warning text-dark mt-1">' . $daysLeft . ' gün qalıb</span>';
                 }
             }
 
@@ -138,25 +159,25 @@ class ExecutorDashboardController extends Controller
                     $statusHtml .= '<br><small class="text-muted">' . e(Str::limit($myLatestLog->custom_note, 30)) . '</small>';
             }
 
-            $pivot    = $act->executors->where('id', $executorId)->first()?->pivot;
+            $pivot = $act->executors->where('id', $executorId)->first()?->pivot;
             $roleHtml = $pivot?->role === 'main'
                 ? '<span class="badge bg-primary">Əsas</span>'
                 : '<span class="badge bg-info">Digər</span>';
 
             $data[] = [
-                'DT_RowClass'     => $rowClass,
-                'id'              => $act->id,
-                'rowNum'          => $start + $i + 1,
-                'actType'         => $act->actType?->name ?? '-',
-                'legalActNumber'  => $act->legal_act_number ?? '-',
-                'legalActDate'    => $act->legal_act_date?->format('d.m.Y') ?? '-',
-                'issuingAuthority'=> $act->issuingAuthority?->name ?? '-',
-                'summary'         => Str::limit($act->summary, 80) ?? '-',
-                'taskNumber'      => $act->task_number ?? '-',
-                'deadlineHtml'    => $deadlineHtml,
-                'statusHtml'      => $statusHtml,
-                'roleHtml'        => $roleHtml,
-                'canChangeStatus' => !$myIsExecuted && !$myIsPending,
+                'DT_RowClass' => $rowClass,
+                'id' => $act->id,
+                'rowNum' => $start + $i + 1,
+                'actType' => $act->actType?->name ?? '-',
+                'legalActNumber' => $act->legal_act_number ?? '-',
+                'legalActDate' => $act->legal_act_date?->format('d.m.Y') ?? '-',
+                'issuingAuthority' => $act->issuingAuthority?->name ?? '-',
+                'summary' => Str::limit($act->summary, 80) ?? '-',
+                'taskNumber' => $act->task_number ?? '-',
+                'deadlineHtml' => $deadlineHtml,
+                'statusHtml' => $statusHtml,
+                'roleHtml' => $roleHtml,
+                'canChangeStatus' => !$myIsExecuted && !$myIsPending && (!$user->canManage() || $executorId === $user->executor_id),
             ];
         }
 
@@ -169,46 +190,50 @@ class ExecutorDashboardController extends Controller
         $this->authorizeAccess($legalAct, $user);
 
         $legalAct->load([
-            'actType', 'issuingAuthority', 'executors.department',
-            'statusLogs.executionNote', 'statusLogs.user', 'statusLogs.attachments',
-            'statusLogs.approvedByUser', 'attachments.user', 'insertedUser',
+            'actType',
+            'issuingAuthority',
+            'executors.department',
+            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser'])->reorder('created_at', 'asc'),
+            'attachments.user',
+            'insertedUser',
         ]);
 
-        $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
+        $mainExecutors = $legalAct->executors->where('pivot.role', 'main')->values();
         $helperExecutors = $legalAct->executors->where('pivot.role', 'helper')->values();
 
         return response()->json([
-            'id'                         => $legalAct->id,
-            'act_type'                   => $legalAct->actType?->name,
-            'legal_act_number'           => $legalAct->legal_act_number,
-            'legal_act_date'             => $legalAct->legal_act_date?->format('d.m.Y'),
-            'summary'                    => $legalAct->summary,
-            'issuing_authority'          => $legalAct->issuingAuthority?->name,
-            'main_executors'             => $mainExecutors->map(fn($e) => ['id' => $e->id, 'name' => $e->name, 'department' => $e->department?->name]),
-            'helper_executors'           => $helperExecutors->map(fn($e) => ['id' => $e->id, 'name' => $e->name, 'department' => $e->department?->name]),
+            'id' => $legalAct->id,
+            'act_type' => $legalAct->actType?->name,
+            'legal_act_number' => $legalAct->legal_act_number,
+            'legal_act_date' => $legalAct->legal_act_date?->format('d.m.Y'),
+            'summary' => $legalAct->summary,
+            'issuing_authority' => $legalAct->issuingAuthority?->name,
+            'main_executors' => $mainExecutors->map(fn($e) => ['id' => $e->id, 'name' => $e->name, 'department' => $e->department?->name]),
+            'helper_executors' => $helperExecutors->map(fn($e) => ['id' => $e->id, 'name' => $e->name, 'department' => $e->department?->name]),
             // Legacy fields
-            'main_executor'              => $mainExecutors->first()?->name,
-            'main_executor_department'   => $mainExecutors->first()?->department?->name,
-            'helper_executor'            => $helperExecutors->first()?->name,
+            'main_executor' => $mainExecutors->first()?->name,
+            'main_executor_department' => $mainExecutors->first()?->department?->name,
+            'helper_executor' => $helperExecutors->first()?->name,
             'helper_executor_department' => $helperExecutors->first()?->department?->name,
-            'task_number'                => $legalAct->task_number,
-            'task_description'           => $legalAct->task_description,
-            'execution_deadline'         => $legalAct->execution_deadline?->format('d.m.Y'),
-            'related_document_number'    => $legalAct->related_document_number,
-            'related_document_date'      => $legalAct->related_document_date?->format('d.m.Y'),
-            'inserted_user'              => $legalAct->insertedUser?->full_name,
-            'created_at'                 => $legalAct->created_at?->format('d.m.Y H:i'),
-            'status_logs'                => $legalAct->statusLogs->map(fn($log) => [
-                'id'              => $log->id,
-                'user'            => $log->user?->full_name,
-                'note'            => $log->executionNote?->note,
-                'custom_note'     => $log->custom_note,
-                'date'            => $log->created_at?->format('d.m.Y H:i'),
+            'task_number' => $legalAct->task_number,
+            'task_description' => $legalAct->task_description,
+            'execution_deadline' => $legalAct->execution_deadline?->format('d.m.Y'),
+            'related_document_number' => $legalAct->related_document_number,
+            'related_document_date' => $legalAct->related_document_date?->format('d.m.Y'),
+            'inserted_user' => $legalAct->insertedUser?->full_name,
+            'created_at' => $legalAct->created_at?->format('d.m.Y H:i'),
+            'status_logs' => $legalAct->statusLogs->map(fn($log) => [
+                'id' => $log->id,
+                'user' => $log->user?->full_name,
+                'executor_id' => $log->user?->executor_id,
+                'note' => $log->executionNote?->note,
+                'custom_note' => $log->custom_note,
+                'date' => $log->created_at?->format('d.m.Y H:i'),
                 'approval_status' => $log->approval_status,
-                'approval_note'   => $log->approval_note,
-                'approved_by'     => $log->approvedByUser?->full_name,
-                'approved_at'     => $log->approved_at?->format('d.m.Y H:i'),
-                'attachments'     => $log->attachments->map(fn($att) => ['id' => $att->id, 'name' => $att->original_name, 'size' => round($att->file_size / 1024, 1) . ' KB', 'mime_type' => $att->mime_type]),
+                'approval_note' => $log->approval_note,
+                'approved_by' => $log->approvedByUser?->full_name,
+                'approved_at' => $log->approved_at?->format('d.m.Y H:i'),
+                'attachments' => $log->attachments->map(fn($att) => ['id' => $att->id, 'name' => $att->original_name, 'size' => round($att->file_size / 1024, 1) . ' KB', 'mime_type' => $att->mime_type]),
             ]),
         ]);
     }
@@ -220,24 +245,28 @@ class ExecutorDashboardController extends Controller
 
         $validated = $request->validate([
             'execution_note_id' => 'required|exists:execution_notes,id',
-            'custom_note'       => 'nullable|string|max:2000',
-            'attachments'       => 'nullable|array|max:10',
-            'attachments.*'     => 'file|max:10240',
+            'custom_note' => 'nullable|string|max:2000',
+            'attachments' => 'nullable|array|max:10',
+            'attachments.*' => 'file|max:10240',
         ]);
 
-        $isIcraOlunub       = $this->isIcraOlunubNote((int) $validated['execution_note_id']);
-        $isQismenIcra       = $this->isQismenIcraNote((int) $validated['execution_note_id']);
+        $isIcraOlunub = $this->isIcraOlunubNote((int) $validated['execution_note_id']);
+        $isQismenIcra = $this->isQismenIcraNote((int) $validated['execution_note_id']);
         $requiresAllExecutors = $isIcraOlunub || $isQismenIcra;
 
         // Block if already approved
-        $latestLog = $legalAct->latestStatusLog()->with('executionNote')->first();
-        if ($latestLog) {
-            $latestIsIcra = $this->isIcraOlunubNote($latestLog->execution_note_id);
-            if ($latestIsIcra && $latestLog->approval_status === 'approved') {
-                return back()->withErrors(['general' => 'Bu sənəd artıq icra olunub və təsdiqlənib.']);
+        $myLatestIcraLog = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
+            ->where('user_id', $user->id)
+            ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
+            ->orderByDesc('id')
+            ->first();
+
+        if ($myLatestIcraLog) {
+            if ($myLatestIcraLog->approval_status === 'approved') {
+                return back()->withErrors(['general' => 'Sizin icranız artıq təsdiqlənib.']);
             }
-            if ($latestIsIcra && $latestLog->approval_status === 'pending') {
-                return back()->withErrors(['general' => 'Bu sənəd üçün təsdiq gözləyən icra qeydi var.']);
+            if (in_array($myLatestIcraLog->approval_status, ['pending', 'partial'])) {
+                return back()->withErrors(['general' => 'Sizin təsdiq gözləyən icra qeydiniz var.']);
             }
         }
 
@@ -257,7 +286,10 @@ class ExecutorDashboardController extends Controller
             $hasValidFiles = false;
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
-                    if ($file && $file->isValid()) { $hasValidFiles = true; break; }
+                    if ($file && $file->isValid()) {
+                        $hasValidFiles = true;
+                        break;
+                    }
                 }
             }
             if (!$hasValidFiles) {
@@ -266,11 +298,12 @@ class ExecutorDashboardController extends Controller
         }
 
         // MIME validation
-        $allowedMimes = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/jpeg','image/png','image/jpg'];
-        $allowedExts  = ['doc','docx','pdf','jpg','jpeg','png'];
+        $allowedMimes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png', 'image/jpg'];
+        $allowedExts = ['doc', 'docx', 'pdf', 'jpg', 'jpeg', 'png'];
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                if (!$file || !$file->isValid()) continue;
+                if (!$file || !$file->isValid())
+                    continue;
                 if (!in_array($file->getClientMimeType(), $allowedMimes) && !in_array(strtolower($file->getClientOriginalExtension()), $allowedExts)) {
                     return back()->withErrors(['attachments' => 'Yalnız Word, PDF və şəkil faylları qəbul olunur.'])->withInput();
                 }
@@ -282,20 +315,25 @@ class ExecutorDashboardController extends Controller
         if ($requiresAllExecutors) {
             // Get ALL executor user_ids assigned to this legal act (both main and helper)
             $allAssignedExecutorIds = $legalAct->executors()->pluck('executors.id')->toArray();
-            $totalExecutors         = count($allAssignedExecutorIds);
+            $totalExecutors = count($allAssignedExecutorIds);
 
             if ($totalExecutors > 1) {
-                // Count how many OTHER users have already submitted partial for this round
                 $otherPartials = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
                     ->where('user_id', '!=', $user->id)
                     ->where('approval_status', 'partial')
+                    ->with('user')
                     ->get();
 
-                // Find executor_ids of those who already submitted
-                $submittedUserIds = $otherPartials->pluck('user_id')->toArray();
+                $submittedExecutorIds = $otherPartials
+                    ->map(fn($log) => $log->user?->executor_id)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray();
 
-                // How many distinct executors have submitted (including current user after this submission)
-                $submittedCount = count($submittedUserIds) + 1; // +1 for current user
+                $currentExecutorId = $user->executor_id;
+                $allSubmitted = array_unique(array_merge($submittedExecutorIds, $currentExecutorId ? [$currentExecutorId] : []));
+                $submittedCount = count($allSubmitted);
 
                 if ($submittedCount >= $totalExecutors) {
                     // Everyone has submitted — promote all partials to pending
@@ -314,32 +352,33 @@ class ExecutorDashboardController extends Controller
         }
 
         $statusLog = ExecutorStatusLog::create([
-            'legal_act_id'      => $legalAct->id,
-            'user_id'           => $user->id,
+            'legal_act_id' => $legalAct->id,
+            'user_id' => $user->id,
             'execution_note_id' => $validated['execution_note_id'],
-            'custom_note'       => $validated['custom_note'] ?? null,
-            'approval_status'   => $approvalStatus,
+            'custom_note' => $validated['custom_note'] ?? null,
+            'approval_status' => $approvalStatus,
         ]);
 
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                if (!$file || !$file->isValid()) continue;
+                if (!$file || !$file->isValid())
+                    continue;
                 $path = $file->store('execution-attachments/' . $legalAct->id, 'local');
                 ExecutionAttachment::create([
-                    'legal_act_id'  => $legalAct->id,
-                    'user_id'       => $user->id,
+                    'legal_act_id' => $legalAct->id,
+                    'user_id' => $user->id,
                     'status_log_id' => $statusLog->id,
-                    'file_path'     => $path,
+                    'file_path' => $path,
                     'original_name' => $file->getClientOriginalName(),
-                    'mime_type'     => $file->getClientMimeType(),
-                    'file_size'     => $file->getSize(),
+                    'mime_type' => $file->getClientMimeType(),
+                    'file_size' => $file->getSize(),
                 ]);
             }
         }
 
         $successMsg = 'Status uğurla yeniləndi.';
         if ($requiresAllExecutors && $approvalStatus === 'partial') {
-            $remaining  = $this->getRemainingExecutorCount($legalAct, $user->id);
+            $remaining = $this->getRemainingExecutorCount($legalAct, $user->id);
             $successMsg = 'Status göndərildi. Daha ' . $remaining . ' icraçının cavabı gözlənilir.';
         } elseif ($requiresAllExecutors && $approvalStatus === 'pending') {
             $successMsg = 'Bütün icraçılar status göndərdi. Admin/menecer təsdiqi gözlənilir.';
@@ -358,9 +397,9 @@ class ExecutorDashboardController extends Controller
     {
         $this->authorizeAttachmentAccess($attachment);
         $fullPath = $this->getAttachmentPath($attachment);
-        $ext      = strtolower(pathinfo($attachment->original_name, PATHINFO_EXTENSION));
+        $ext = strtolower(pathinfo($attachment->original_name, PATHINFO_EXTENSION));
 
-        if (in_array($ext, ['jpg','jpeg','png'])) {
+        if (in_array($ext, ['jpg', 'jpeg', 'png'])) {
             return response()->file($fullPath, ['Content-Type' => $ext === 'png' ? 'image/png' : 'image/jpeg', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"']);
         }
         if ($ext === 'pdf') {
@@ -371,9 +410,9 @@ class ExecutorDashboardController extends Controller
         }
         if ($ext === 'doc') {
             try {
-                $phpWord  = \PhpOffice\PhpWord\IOFactory::load($fullPath, 'MsDoc');
+                $phpWord = \PhpOffice\PhpWord\IOFactory::load($fullPath, 'MsDoc');
                 $tempPath = storage_path('app/private/temp_preview_' . uniqid() . '.docx');
-                $writer   = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+                $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
                 $writer->save($tempPath);
                 return response()->file($tempPath, ['Content-Type' => 'application/octet-stream', 'Content-Disposition' => 'inline; filename="preview.docx"'])->deleteFileAfterSend(true);
             } catch (\Exception $e) {
@@ -387,7 +426,7 @@ class ExecutorDashboardController extends Controller
 
     private function getRemainingExecutorCount(LegalAct $legalAct, int $currentUserId): int
     {
-        $total     = $legalAct->executors()->count();
+        $total = $legalAct->executors()->count();
         $submitted = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
             ->whereIn('approval_status', ['partial', 'pending'])
             ->distinct('user_id')
@@ -398,7 +437,8 @@ class ExecutorDashboardController extends Controller
     private function getAttachmentPath(ExecutionAttachment $attachment): string
     {
         foreach ([storage_path('app/private/' . $attachment->file_path), storage_path('app/' . $attachment->file_path)] as $path) {
-            if (file_exists($path)) return $path;
+            if (file_exists($path))
+                return $path;
         }
         abort(404, 'Fayl tapılmadı.');
     }
@@ -406,13 +446,17 @@ class ExecutorDashboardController extends Controller
     private function authorizeAttachmentAccess(ExecutionAttachment $attachment): void
     {
         $user = auth()->user();
-        if ($attachment->legalAct && $user->isExecutor()) $this->authorizeAccess($attachment->legalAct, $user);
+        if ($attachment->legalAct && $user->isExecutor())
+            $this->authorizeAccess($attachment->legalAct, $user);
     }
 
     private function authorizeAccess(LegalAct $legalAct, $user): void
     {
-        if ($user->canManage()) return;
-        if (!$user->executor_id) abort(403, 'İcraçı profiliniz yoxdur.');
-        if (!$legalAct->executors()->where('executors.id', $user->executor_id)->exists()) abort(403, 'Bu sənədə giriş icazəniz yoxdur.');
+        if ($user->canManage())
+            return;
+        if (!$user->executor_id)
+            abort(403, 'İcraçı profiliniz yoxdur.');
+        if (!$legalAct->executors()->where('executors.id', $user->executor_id)->exists())
+            abort(403, 'Bu sənədə giriş icazəniz yoxdur.');
     }
 }
