@@ -287,7 +287,7 @@
         });
 
         async function reviewDetails(id) {
-            var data = await fetchJson('/approvals/show/' + id);
+            var data = await fetchJson('/approvals/' + id);
             if (!data) return;
 
             var logsHtml = '<p class="text-muted fst-italic">Status tarixçəsi yoxdur.</p>';
