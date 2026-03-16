@@ -20,7 +20,7 @@ class LegalAct extends Model
         'execution_deadline',
         'related_document_number',
         'related_document_date',
-        'created_by',
+        'proof_required',
         'created_date',
         'inserted_user_id',
         'is_active',
@@ -34,14 +34,13 @@ class LegalAct extends Model
         'created_date' => 'datetime',
         'is_active' => 'boolean',
         'is_deleted' => 'boolean',
+        'proof_required' => 'boolean',
     ];
 
     public function scopeActive($query)
     {
         return $query->where('is_deleted', false);
     }
-
-    // ─── Relationships ──────────────────────────────────────────
 
     public function actType()
     {
@@ -90,12 +89,6 @@ class LegalAct extends Model
         return $this->belongsTo(User::class, 'inserted_user_id');
     }
 
-    // ─── Approval-aware helpers ─────────────────────────────────
-
-    /**
-     * Check if the legal act has been FULLY executed.
-     * Requires: latest "İcra olunub" log is APPROVED by admin/manager.
-     */
     public function getIsExecutedAttribute(): bool
     {
         $latest = $this->latestStatusLog;
@@ -104,13 +97,9 @@ class LegalAct extends Model
         $noteText = $latest->executionNote?->note ?? '';
         $isIcraOlunub = $noteText && mb_stripos($noteText, 'İcra olunub') !== false;
 
-        // Only count as executed if the log is approved
         return $isIcraOlunub && $latest->approval_status === ExecutorStatusLog::APPROVAL_APPROVED;
     }
 
-    /**
-     * Check if there's a pending "İcra olunub" awaiting approval.
-     */
     public function getIsPendingApprovalAttribute(): bool
     {
         $latest = $this->latestStatusLog;
@@ -122,9 +111,6 @@ class LegalAct extends Model
         return $isIcraOlunub && $latest->approval_status === ExecutorStatusLog::APPROVAL_PENDING;
     }
 
-    /**
-     * Check if the latest "İcra olunub" was rejected.
-     */
     public function getIsRejectedAttribute(): bool
     {
         $latest = $this->latestStatusLog;
@@ -136,9 +122,6 @@ class LegalAct extends Model
         return $isIcraOlunub && $latest->approval_status === ExecutorStatusLog::APPROVAL_REJECTED;
     }
 
-    /**
-     * Get pending approval logs for this legal act.
-     */
     public function pendingApprovalLogs()
     {
         return $this->statusLogs()->where('approval_status', ExecutorStatusLog::APPROVAL_PENDING);

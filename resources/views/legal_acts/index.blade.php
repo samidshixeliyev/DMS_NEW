@@ -78,44 +78,21 @@
             padding: 0.5rem 0.45rem;
         }
 
-        th.bg-band-doc {
+        th.bg-band-doc,
+        th.bg-band-task,
+        th.bg-band-exec,
+        th.bg-band-actions {
             background: #1e3a5f !important;
         }
 
-        th.bg-band-doc-sub {
+        th.bg-band-doc-sub,
+        th.bg-band-task-sub,
+        th.bg-band-exec-sub {
             background: #2a5298 !important;
         }
 
-        th.bg-band-task {
-            background: #065f46 !important;
-        }
-
-        th.bg-band-task-sub {
-            background: #10a37f !important;
-        }
-
-        th.bg-band-exec {
-            background: #5b21b6 !important;
-        }
-
-        th.bg-band-exec-sub {
-            background: #7c4ddb !important;
-        }
-
-        th.bg-band-icra {
-            background: #92400e !important;
-        }
-
-        th.bg-band-icra-sub {
-            background: #d97706 !important;
-        }
-
-        th.bg-band-actions {
-            background: #374151 !important;
-        }
-
         #legalActsTable {
-            min-width: 2100px;
+            min-width: 1800px;
         }
 
         #legalActsTable tbody td {
@@ -129,8 +106,8 @@
             white-space: normal;
             word-break: break-word;
             text-align: left;
-            min-width: 180px;
-            max-width: 280px;
+            min-width: 120px;
+            max-width: 230px;
         }
 
         #legalActsTable tbody tr:nth-child(even):not([class*="row-"]) {
@@ -371,7 +348,6 @@
                             <th colspan="5" class="bg-band-doc">Sənəd Məlumatları</th>
                             <th colspan="2" class="bg-band-task">Tapşırıq</th>
                             <th colspan="4" class="bg-band-exec">İcraçı Məlumatları</th>
-                            <th colspan="3" class="bg-band-icra">İcra Məlumatları</th>
                             <th rowspan="2" class="bg-band-actions" style="position:sticky;right:0;z-index:4;"></th>
                         </tr>
                         <tr class="sub-header">
@@ -386,9 +362,6 @@
                             <th class="bg-band-exec-sub">Bölmə</th>
                             <th class="bg-band-exec-sub">İcra Müddəti</th>
                             <th class="bg-band-exec-sub">Qeyd</th>
-                            <th class="bg-band-icra-sub">Sənəd №</th>
-                            <th class="bg-band-icra-sub">Sənəd Tarixi</th>
-                            <th class="bg-band-icra-sub">Daxil Edən</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -500,6 +473,19 @@
                                 <input type="text" name="related_document_date" class="form-control modal-datepicker"
                                     value="{{ old('related_document_date') }}">
                             </div>
+                            @if($canManage)
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="proof_required"
+                                            id="create_proof_required" value="1" {{ old('proof_required') ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="create_proof_required">
+                                            <i class="bi bi-shield-lock me-1"></i> Sübut sənəd məcburidir
+                                            <small class="text-muted d-block">İcraçı "İcra olunub" statusu seçdikdə fayl yükləmə
+                                                məcburi olacaq</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -599,9 +585,9 @@
                     data: function (d) { var f = gfp(); d.col = {}; Object.keys(f).forEach(function (k) { var m = k.match(/^col\[(.+)\]$/); if (m) d.col[m[1]] = f[k]; }); }
                 },
                 columns: [
-                    { data: 'actType', className: 'text-center', render: function (d) { return (!d || d === '-') ? '-' : '<span class="badge" style="background:var(--accent-dark,#1e3a5f)">' + escapeHtml(d) + '</span>'; } },
+                    { data: 'actType', className: 'text-center', width: '80px', render: function (d) { return (!d || d === '-') ? '-' : '<span class="badge" style="background:var(--accent-dark,#1e3a5f)">' + escapeHtml(d) + '</span>'; } },
                     { data: 'legalActNumber', className: 'fw-semibold text-center' },
-                    { data: 'legalActDate', className: 'text-center' },
+                    { data: 'legalActDate', className: 'text-center', width: '85px' },
                     { data: 'issuingAuthority' },
                     { data: 'summary', className: 'wrap-cell' },
                     { data: 'taskNumber', className: 'text-center' },
@@ -609,15 +595,14 @@
                     { data: 'executor' },
                     { data: 'department' },
                     { data: 'deadlineHtml', className: 'text-center' },
-                    { data: 'noteHtml' },
-                    { data: 'relatedDocNumber', className: 'text-center' },
-                    { data: 'relatedDocDate', className: 'text-center' },
-                    { data: 'insertedUser' },
+                    { data: 'noteHtml', },
+
                     {
                         data: null, orderable: false, searchable: false, render: function (d) {
                             var h = '<div class="action-btns">';
                             h += '<button class="btn btn-sm btn-info" title="Bax" onclick="showDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>';
                             if (d.hasPendingApproval) h += '<button class="btn btn-sm btn-success" title="Təsdiq gözləyir" onclick="showApproval(' + d.id + ',' + d.pendingLogId + ')"><i class="bi bi-check-circle"></i></button>';
+                            if (d.canEdit && canManage) h += '<button class="btn btn-sm ' + (d.proofRequired ? 'btn-dark' : 'btn-outline-secondary') + '" title="' + (d.proofRequired ? 'Sübut məcburi' : 'Sübut ixtiyari') + '" onclick="toggleProof(' + d.id + ')"><i class="bi bi-shield-lock"></i></button>';
                             if (d.canEdit) h += '<button class="btn btn-sm btn-warning" title="Redaktə" onclick="editRecord(' + d.id + ')"><i class="bi bi-pencil"></i></button>';
                             if (d.canDelete) h += '<button class="btn btn-sm btn-danger" title="Sil" onclick="deleteRecord(' + d.id + ')"><i class="bi bi-trash"></i></button>';
                             return h + '</div>';
@@ -714,11 +699,14 @@
             groupByDept(data.helper_executors, 'Digər');
 
             var logsByExec = {};
+            var orphanLogs = [];
             (data.status_logs || []).forEach(function (log) {
                 var exId = log.executor_id;
                 if (exId) {
                     if (!logsByExec[exId]) logsByExec[exId] = [];
                     logsByExec[exId].push(log);
+                } else {
+                    orphanLogs.push(log);
                 }
             });
 
@@ -811,6 +799,7 @@
                 + '<tr><th>Əlaqəli sənəd</th><td>' + escapeHtml(data.related_document_number || '-') + '</td></tr>'
                 + '<tr><th>Daxil edən</th><td>' + escapeHtml(data.inserted_user || '-') + '</td></tr>'
                 + '<tr><th>Yaradılma</th><td>' + escapeHtml(data.created_at || '-') + '</td></tr>'
+                + '<tr><th>Sübut sənəd</th><td>' + (data.proof_required ? '<span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Məcburidir</span>' : '<span class="badge bg-secondary">İxtiyari</span>') + '</td></tr>'
                 + '</table></div>'
                 + '<div class="col-lg-5"><h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i> İcraçılar və Status</h6>' + rightHtml + '</div>'
                 + '</div>';
@@ -858,6 +847,10 @@
             h += '<div class="col-12"><label class="form-label">Tapşırıq</label><textarea name="task_description" class="form-control" rows="2">' + escapeHtml(data.task_description || '') + '</textarea></div>';
             h += '<div class="col-md-6"><label class="form-label">Əlaqəli sənəd №</label><input type="text" name="related_document_number" class="form-control" value="' + escapeHtml(data.related_document_number || '') + '"></div>';
             h += '<div class="col-md-6"><label class="form-label">Əlaqəli sənəd tarixi</label><input type="text" name="related_document_date" class="form-control edit-datepicker" value="' + escapeHtml(data.related_document_date || '') + '"></div>';
+            h += '<div class="col-12"><div class="form-check form-switch">';
+            h += '<input class="form-check-input" type="checkbox" name="proof_required" id="edit_proof_required" value="1"' + (data.proof_required ? ' checked' : '') + '>';
+            h += '<label class="form-check-label" for="edit_proof_required"><i class="bi bi-shield-lock me-1"></i> Sübut sənəd məcburidir</label>';
+            h += '</div></div>';
             h += '</div>';
 
             document.getElementById('editModalBody').innerHTML = h;
@@ -883,6 +876,20 @@
                 var f = document.getElementById('deleteForm');
                 f.action = '/legal-acts/' + id;
                 f.submit();
+            }
+        }
+        async function toggleProof(id) {
+            try {
+                var res = await fetch('/legal-acts/' + id + '/toggle-proof', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                });
+                var data = await res.json();
+                if (data.success) {
+                    $('#legalActsTable').DataTable().ajax.reload(null, false);
+                }
+            } catch (e) {
+                alert('Xəta baş verdi');
             }
         }
     </script>

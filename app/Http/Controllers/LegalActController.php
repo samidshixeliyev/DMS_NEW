@@ -14,6 +14,7 @@ use App\Exports\LegalActsExport;
 use App\Services\LegalActWordExportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class LegalActController extends Controller
 {
@@ -231,6 +232,7 @@ class LegalActController extends Controller
                 'canDelete' => $isAdmin,
                 'hasPendingApproval' => $anyPending,
                 'pendingLogId' => $pendingLogId,
+                'proofRequired' => (bool) $act->proof_required,
             ];
         }
 
@@ -251,12 +253,7 @@ class LegalActController extends Controller
             'main_executor_ids.*' => 'required|exists:executors,id',
             'helper_executor_ids' => 'nullable|array',
             'helper_executor_ids.*' => 'required|exists:executors,id',
-            'legal_act_number' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('legal_acts')->where(fn($q) => $q->where('act_type_id', $request->act_type_id)),
-            ],
+            'legal_act_number' => 'required|string|max:255',
             'legal_act_date' => 'required|date',
             'summary' => 'required|string',
             'task_number' => 'nullable|string|max:255',
@@ -264,7 +261,19 @@ class LegalActController extends Controller
             'execution_deadline' => 'nullable|date',
             'related_document_number' => 'nullable|string|max:255',
             'related_document_date' => 'nullable|date',
+            'proof_required' => 'nullable|boolean',
         ], $this->validationMessages());
+
+        $year = Carbon::parse($validated['legal_act_date'])->year;
+        $exists = LegalAct::where('act_type_id', $validated['act_type_id'])
+            ->where('legal_act_number', $validated['legal_act_number'])
+            ->whereYear('legal_act_date', $year)
+            ->where('is_deleted', false)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['legal_act_number' => 'Bu akt növü və il üzrə eyni nömrəli hüquqi akt artıq mövcuddur.'])->withInput();
+        }
 
         $mainIds = array_unique(array_map('intval', $validated['main_executor_ids']));
         $helperIds = array_unique(array_map('intval', $validated['helper_executor_ids'] ?? []));
@@ -275,6 +284,7 @@ class LegalActController extends Controller
 
         $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids'])->toArray();
         $actData['inserted_user_id'] = auth()->id();
+        $actData['proof_required'] = $request->boolean('proof_required') ? 1 : 0;
 
         $legalAct = LegalAct::create($actData);
 
@@ -334,6 +344,7 @@ class LegalActController extends Controller
             'execution_deadline' => $legalAct->execution_deadline?->format('d.m.Y'),
             'related_document_number' => $legalAct->related_document_number,
             'related_document_date' => $legalAct->related_document_date?->format('d.m.Y'),
+            'proof_required' => (bool) $legalAct->proof_required,
             'inserted_user' => $legalAct->insertedUser
                 ? $legalAct->insertedUser->name . ' ' . $legalAct->insertedUser->surname : null,
             'created_at' => $legalAct->created_at?->format('d.m.Y H:i'),
@@ -380,6 +391,7 @@ class LegalActController extends Controller
             'execution_deadline' => $legalAct->execution_deadline?->format('Y-m-d'),
             'related_document_number' => $legalAct->related_document_number,
             'related_document_date' => $legalAct->related_document_date?->format('Y-m-d'),
+            'proof_required' => (bool) $legalAct->proof_required,
             'act_types' => ActType::active()->get(),
             'authorities' => IssuingAuthority::active()->get(),
             'executors' => Executor::with('department')->active()->get(),
@@ -399,14 +411,7 @@ class LegalActController extends Controller
             'main_executor_ids.*' => 'required|exists:executors,id',
             'helper_executor_ids' => 'nullable|array',
             'helper_executor_ids.*' => 'required|exists:executors,id',
-            'legal_act_number' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('legal_acts')
-                    ->where(fn($q) => $q->where('act_type_id', $request->act_type_id))
-                    ->ignore($legalAct->id),
-            ],
+            'legal_act_number' => 'required|string|max:255',
             'legal_act_date' => 'required|date',
             'summary' => 'required|string',
             'task_number' => 'nullable|string|max:255',
@@ -414,7 +419,20 @@ class LegalActController extends Controller
             'execution_deadline' => 'nullable|date',
             'related_document_number' => 'nullable|string|max:255',
             'related_document_date' => 'nullable|date',
+            'proof_required' => 'nullable|boolean',
         ], $this->validationMessages());
+
+        $year = Carbon::parse($validated['legal_act_date'])->year;
+        $exists = LegalAct::where('act_type_id', $validated['act_type_id'])
+            ->where('legal_act_number', $validated['legal_act_number'])
+            ->whereYear('legal_act_date', $year)
+            ->where('is_deleted', false)
+            ->where('id', '!=', $legalAct->id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['legal_act_number' => 'Bu akt növü və il üzrə eyni nömrəli hüquqi akt artıq mövcuddur.'])->withInput();
+        }
 
         $mainIds = array_unique(array_map('intval', $validated['main_executor_ids']));
         $helperIds = array_unique(array_map('intval', $validated['helper_executor_ids'] ?? []));
@@ -424,6 +442,8 @@ class LegalActController extends Controller
         }
 
         $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids'])->toArray();
+        $actData['proof_required'] = $request->boolean('proof_required') ? 1 : 0;
+
         $legalAct->update($actData);
 
         $legalAct->executors()->detach();
@@ -463,7 +483,24 @@ class LegalActController extends Controller
             ->deleteFileAfterSend(true);
     }
 
-    // ─── Private helpers ──────────────────────────────────────────────────
+    public function toggleProofRequired(LegalAct $legalAct)
+    {
+        if (!auth()->user()->canManage()) {
+            abort(403);
+        }
+
+        $legalAct->update([
+            'proof_required' => !$legalAct->proof_required,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'proof_required' => (bool) $legalAct->proof_required,
+            'message' => $legalAct->proof_required
+                ? 'Sübut sənəd məcburi edildi.'
+                : 'Sübut sənəd məcburiliyi ləğv edildi.',
+        ]);
+    }
 
     private function applyFilters(Request $request)
     {
@@ -560,7 +597,6 @@ class LegalActController extends Controller
         return [
             'act_type_id.required' => 'Akt növü mütləq seçilməlidir.',
             'act_type_id.exists' => 'Seçilmiş akt növü mövcud deyil.',
-            'legal_act_number.unique' => 'Bu akt növü üzrə eyni nömrəli hüquqi akt artıq mövcuddur.',
             'issued_by_id.required' => 'Verən orqan mütləq seçilməlidir.',
             'issued_by_id.exists' => 'Seçilmiş verən orqan mövcud deyil.',
             'main_executor_ids.required' => 'Ən azı bir əsas icraçı seçilməlidir.',

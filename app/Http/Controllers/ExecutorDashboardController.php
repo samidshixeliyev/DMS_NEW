@@ -177,6 +177,7 @@ class ExecutorDashboardController extends Controller
                 'deadlineHtml' => $deadlineHtml,
                 'statusHtml' => $statusHtml,
                 'roleHtml' => $roleHtml,
+                'proofRequired' => (bool) $act->proof_required,
                 'canChangeStatus' => !$myIsExecuted && !$myIsPending && (!$user->canManage() || $executorId === $user->executor_id),
             ];
         }
@@ -210,7 +211,6 @@ class ExecutorDashboardController extends Controller
             'issuing_authority' => $legalAct->issuingAuthority?->name,
             'main_executors' => $mainExecutors->map(fn($e) => ['id' => $e->id, 'name' => $e->name, 'department' => $e->department?->name]),
             'helper_executors' => $helperExecutors->map(fn($e) => ['id' => $e->id, 'name' => $e->name, 'department' => $e->department?->name]),
-            // Legacy fields
             'main_executor' => $mainExecutors->first()?->name,
             'main_executor_department' => $mainExecutors->first()?->department?->name,
             'helper_executor' => $helperExecutors->first()?->name,
@@ -220,6 +220,7 @@ class ExecutorDashboardController extends Controller
             'execution_deadline' => $legalAct->execution_deadline?->format('d.m.Y'),
             'related_document_number' => $legalAct->related_document_number,
             'related_document_date' => $legalAct->related_document_date?->format('d.m.Y'),
+            'proof_required' => (bool) $legalAct->proof_required,
             'inserted_user' => $legalAct->insertedUser?->full_name,
             'created_at' => $legalAct->created_at?->format('d.m.Y H:i'),
             'status_logs' => $legalAct->statusLogs->map(fn($log) => [
@@ -254,7 +255,6 @@ class ExecutorDashboardController extends Controller
         $isQismenIcra = $this->isQismenIcraNote((int) $validated['execution_note_id']);
         $requiresAllExecutors = $isIcraOlunub || $isQismenIcra;
 
-        // Block if already approved
         $myLatestIcraLog = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
             ->where('user_id', $user->id)
             ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
@@ -270,7 +270,6 @@ class ExecutorDashboardController extends Controller
             }
         }
 
-        // Block if this user already has a partial for this round
         if ($requiresAllExecutors) {
             $existingPartial = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
                 ->where('user_id', $user->id)
@@ -281,8 +280,7 @@ class ExecutorDashboardController extends Controller
             }
         }
 
-        // İcra olunub requires at least 1 file
-        if ($isIcraOlunub) {
+        if ($isIcraOlunub && $legalAct->proof_required) {
             $hasValidFiles = false;
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
@@ -293,11 +291,10 @@ class ExecutorDashboardController extends Controller
                 }
             }
             if (!$hasValidFiles) {
-                return back()->withErrors(['attachments' => '"İcra olunub" statusu seçildikdə ən azı bir sübut sənəd yükləmək MƏCBURİDİR!'])->withInput();
+                return back()->withErrors(['attachments' => '"İcra olunub" statusu seçildikdə bu sənəd üçün ən azı bir sübut sənəd yükləmək MƏCBURİDİR!'])->withInput();
             }
         }
 
-        // MIME validation
         $allowedMimes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png', 'image/jpg'];
         $allowedExts = ['doc', 'docx', 'pdf', 'jpg', 'jpeg', 'png'];
         if ($request->hasFile('attachments')) {
@@ -310,10 +307,8 @@ class ExecutorDashboardController extends Controller
             }
         }
 
-        // ── Multi-executor partial logic ───────────────────────────────
         $approvalStatus = null;
         if ($requiresAllExecutors) {
-            // Get ALL executor user_ids assigned to this legal act (both main and helper)
             $allAssignedExecutorIds = $legalAct->executors()->pluck('executors.id')->toArray();
             $totalExecutors = count($allAssignedExecutorIds);
 
@@ -336,17 +331,14 @@ class ExecutorDashboardController extends Controller
                 $submittedCount = count($allSubmitted);
 
                 if ($submittedCount >= $totalExecutors) {
-                    // Everyone has submitted — promote all partials to pending
                     $approvalStatus = 'pending';
                     ExecutorStatusLog::where('legal_act_id', $legalAct->id)
                         ->where('approval_status', 'partial')
                         ->update(['approval_status' => 'pending']);
                 } else {
-                    // Still waiting for others
                     $approvalStatus = 'partial';
                 }
             } else {
-                // Only one executor — go straight to pending
                 $approvalStatus = $isIcraOlunub ? 'pending' : null;
             }
         }
@@ -421,8 +413,6 @@ class ExecutorDashboardController extends Controller
         }
         return response()->download($fullPath, $attachment->original_name);
     }
-
-    // ─── Private helpers ────────────────────────────────────────────────────
 
     private function getRemainingExecutorCount(LegalAct $legalAct, int $currentUserId): int
     {

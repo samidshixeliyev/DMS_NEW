@@ -462,15 +462,30 @@
             if (data.status_logs && data.status_logs.length > 0) {
                 logsHtml = '<div class="timeline">';
                 data.status_logs.forEach(function (log) {
-                    logsHtml += '<div class="timeline-item">'
+                    var accent = '#3b82f6';
+                    if (log.approval_status === 'approved') accent = '#16a34a';
+                    else if (log.approval_status === 'rejected') accent = '#dc2626';
+                    else if (log.approval_status === 'pending') accent = '#ca8a04';
+                    else if (log.approval_status === 'partial') accent = '#0284c7';
+                    logsHtml += '<div class="timeline-item" style="--accent:' + accent + '">'
                         + '<div class="tl-date">' + escapeHtml(log.date || '') + '</div>'
                         + '<div class="tl-user"><i class="bi bi-person me-1"></i>' + escapeHtml(log.user || '') + '</div>'
                         + '<div class="tl-note">' + escapeHtml(log.note || '') + '</div>'
-                        + (log.custom_note ? '<div class="tl-custom">"' + escapeHtml(log.custom_note) + '"</div>' : '')
-                        + buildAttachmentHtml(log.attachments)
+                        + (log.custom_note ? '<div class="tl-custom">"' + escapeHtml(log.custom_note) + '"</div>' : '');
+                    if (log.approval_status) {
+                        var map = { approved: 'bg-success', pending: 'bg-warning text-dark', rejected: 'bg-danger', partial: 'bg-info text-dark' };
+                        var labels = { approved: 'İcra olunub ✓', pending: 'Təsdiq gözləyir', rejected: 'Rədd edilib', partial: 'Natamam' };
+                        logsHtml += '<div class="mt-1"><span class="badge ' + (map[log.approval_status] || 'bg-secondary') + '">' + (labels[log.approval_status] || log.approval_status) + '</span></div>';
+                    }
+                    if (log.approved_by) {
+                        logsHtml += '<div style="font-size:0.75rem" class="text-muted mt-1"><i class="bi bi-check2-circle me-1" style="color:#16a34a"></i>' + escapeHtml(log.approved_by) + ' · ' + escapeHtml(log.approved_at || '') + '</div>';
+                    }
+                    if (log.approval_note) {
+                        logsHtml += '<div style="font-size:0.75rem" class="text-muted"><i class="bi bi-chat-left-text me-1"></i>' + escapeHtml(log.approval_note) + '</div>';
+                    }
+                    logsHtml += buildAttachmentHtml(log.attachments)
                         + '</div>';
                 });
-                logsHtml += '</div>';
             }
             document.getElementById('showModalBody').innerHTML =
                 '<div class="row">'
