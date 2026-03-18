@@ -81,6 +81,7 @@
         .alert-info { background: linear-gradient(135deg, rgba(0, 180, 216, 0.1), rgba(0, 180, 216, 0.05)); color: #0c4a6e; border-left: 4px solid var(--accent); }
         .badge { font-weight: 600; font-size: 0.75rem; padding: 0.35em 0.65em; border-radius: 6px; }
         .filter-card .card-header { background: linear-gradient(135deg, rgba(0, 180, 216, 0.08), rgba(0, 180, 216, 0.02)); cursor: pointer; }
+        .pagination .page-link { font-size: 0.85rem; padding: 0.375rem 0.65rem; line-height: 1.5;}
         .filter-card .card-header h5 { font-size: 0.95rem; color: var(--primary); }
         .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
         .page-header h2 { font-weight: 800; font-size: 1.75rem; color: var(--primary-dark); margin: 0; letter-spacing: -0.5px; }

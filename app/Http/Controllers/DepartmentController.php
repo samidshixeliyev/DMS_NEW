@@ -9,8 +9,51 @@ class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::active()->paginate(20);
-        return view('departments.index', compact('departments'));
+        return view('departments.index');
+    }
+
+    public function load(Request $request)
+    {
+        $draw = $request->input('draw', 1);
+        $start = $request->input('start', 0);
+        $length = $request->input('length', 25);
+
+        $totalRecords = Department::active()->count();
+
+        $query = Department::active();
+
+        $search = $request->input('search.value');
+        if ($search) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        $filteredRecords = (clone $query)->count();
+
+        $orderCol = (int) $request->input('order.0.column', 0);
+        $orderDir = $request->input('order.0.dir', 'asc') === 'asc' ? 'asc' : 'desc';
+        match ($orderCol) {
+            0 => $query->orderBy('id', $orderDir),
+            1 => $query->orderBy('name', $orderDir),
+            default => $query->orderBy('id', 'desc'),
+        };
+
+        $results = $query->skip($start)->take($length)->get();
+
+        $data = [];
+        foreach ($results as $i => $dept) {
+            $data[] = [
+                'id' => $dept->id,
+                'rowNum' => $start + $i + 1,
+                'name' => $dept->name,
+            ];
+        }
+
+        return response()->json([
+            'draw' => (int) $draw,
+            'recordsTotal' => $totalRecords,
+            'recordsFiltered' => $filteredRecords,
+            'data' => $data,
+        ]);
     }
 
     public function store(Request $request)

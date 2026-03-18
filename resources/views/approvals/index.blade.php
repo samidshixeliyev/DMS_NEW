@@ -198,21 +198,21 @@
                 <form id="rejectForm" method="POST">
                     @csrf
                     <div class="modal-header" style="background: linear-gradient(135deg, #d63384, #ef476f); color: #fff;">
-                        <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i>İcranı Rədd Et</h5>
+                        <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i>İcranı İmtina Et</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-danger fw-semibold">Bu sənədin icrasını rədd edirsiniz. İcraçı yenidən status təyin
+                        <p class="text-danger fw-semibold">Bu sənədin icrasını İmtina edirsiniz. İcraçı yenidən status təyin
                             edəcək.</p>
                         <div class="mb-3">
-                            <label class="form-label">Rədd səbəbi <span class="text-danger">*</span></label>
+                            <label class="form-label">İmtina səbəbi <span class="text-danger">*</span></label>
                             <textarea name="approval_note" class="form-control" rows="3"
-                                placeholder="Rədd səbəbini mütləq yazın..." required></textarea>
+                                placeholder="İmtina səbəbini mütləq yazın..." required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İmtina</button>
-                        <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle me-1"></i> Rədd Et</button>
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle me-1"></i> İmtina Et</button>
                     </div>
                 </form>
             </div>
@@ -265,7 +265,7 @@
                             return '<div class="action-btns">'
                                 + '<button class="btn btn-sm btn-info" title="Bax" onclick="reviewDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>'
                                 + '<button class="btn btn-sm btn-success" title="Təsdiqlə" onclick="approveRecord(' + d.logId + ')"><i class="bi bi-check-lg"></i></button>'
-                                + '<button class="btn btn-sm btn-danger" title="Rədd et" onclick="rejectRecord(' + d.logId + ')"><i class="bi bi-x-lg"></i></button>'
+                                + '<button class="btn btn-sm btn-danger" title="İmtina et" onclick="rejectRecord(' + d.logId + ')"><i class="bi bi-x-lg"></i></button>'
                                 + '</div>';
                         }
                     }
@@ -300,7 +300,7 @@
                     } else if (log.approval_status === 'approved') {
                         approvalBadge = '<span class="badge approval-badge-approved ms-1">Təsdiqlənib ✓</span>';
                     } else if (log.approval_status === 'rejected') {
-                        approvalBadge = '<span class="badge approval-badge-rejected ms-1">Rədd edilib ✗</span>';
+                        approvalBadge = '<span class="badge approval-badge-rejected ms-1">İmtina edilib ✗</span>';
                     }
 
                     logsHtml += '<div class="timeline-item">'

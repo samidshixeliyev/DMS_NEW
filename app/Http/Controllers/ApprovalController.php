@@ -202,6 +202,6 @@ class ApprovalController extends Controller
             'approval_note'   => $validated['approval_note'],
             'approved_at'     => now(),
         ]);
-        return redirect()->route('approvals.index')->with('success', 'İcra qeydi rədd edildi. İcraçı yenidən status təyin edə bilər.');
+        return redirect()->route('approvals.index')->with('success', 'İcra qeydi imtina edildi. İcraçı yenidən status təyin edə bilər.');
     }
 }

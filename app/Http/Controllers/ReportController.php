@@ -213,7 +213,7 @@ class ReportController extends Controller
                 <th>Cəmi</th>
                 <th>İcra olunub</th>
                 <th>Təsdiq gözləyir</th>
-                <th>Rədd edilib</th>
+                <th>İmtina edilib</th>
                 <th>İcradadır</th>
                 <th>Başlanmayıb</th>
                 <th>Müddəti keçib</th>

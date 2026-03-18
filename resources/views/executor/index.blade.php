@@ -474,7 +474,7 @@
                         + (log.custom_note ? '<div class="tl-custom">"' + escapeHtml(log.custom_note) + '"</div>' : '');
                     if (log.approval_status) {
                         var map = { approved: 'bg-success', pending: 'bg-warning text-dark', rejected: 'bg-danger', partial: 'bg-info text-dark' };
-                        var labels = { approved: 'İcra olunub ✓', pending: 'Təsdiq gözləyir', rejected: 'Rədd edilib', partial: 'Natamam' };
+                        var labels = { approved: 'İcra olunub ✓', pending: 'Təsdiq gözləyir', rejected: 'İmtina edilib', partial: 'Natamam' };
                         logsHtml += '<div class="mt-1"><span class="badge ' + (map[log.approval_status] || 'bg-secondary') + '">' + (labels[log.approval_status] || log.approval_status) + '</span></div>';
                     }
                     if (log.approved_by) {

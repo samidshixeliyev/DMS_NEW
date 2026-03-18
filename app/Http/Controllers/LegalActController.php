@@ -163,7 +163,7 @@ class LegalActController extends Controller
                         $noteHtml .= match ($status) {
                             ExecutorStatusLog::APPROVAL_APPROVED => '<span class="badge bg-success">İcra olunub ✓</span>',
                             ExecutorStatusLog::APPROVAL_PENDING => '<span class="badge bg-warning text-dark">Təsdiq gözləyir</span>',
-                            ExecutorStatusLog::APPROVAL_REJECTED => '<span class="badge bg-danger">Rədd edilib</span>',
+                            ExecutorStatusLog::APPROVAL_REJECTED => '<span class="badge bg-danger">İmtina edilib</span>',
                             ExecutorStatusLog::APPROVAL_PARTIAL => '<span class="badge bg-info text-dark">Natamam</span>',
                             default => '<span class="badge bg-secondary">' . e(Str::limit($logNote ?: 'İcradadır', 25)) . '</span>',
                         };

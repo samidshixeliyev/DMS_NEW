@@ -387,8 +387,8 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Sənədin tarixi <span class="text-danger">*</span></label>
-                                <input type="text" name="legal_act_date" class="form-control modal-datepicker"
-                                    value="{{ old('legal_act_date') }}" required>
+                                <input type="text" name="legal_act_date" class="form-control modal-datepicker "
+                                    value="{{ old('legal_act_date') }}" required autocomplete="false">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Növü <span class="text-danger">*</span></label>
@@ -642,7 +642,7 @@
                 $(this).select2({ theme: 'bootstrap-5', dropdownParent: $cm.find('.modal-body'), placeholder: 'Seçin...', allowClear: true, width: '100%' });
             });
             $cm.find('.modal-datepicker').each(function () {
-                flatpickr(this, { dateFormat: 'Y-m-d', locale: flatpickr.l10ns.az, allowInput: true });
+                flatpickr(this, { dateFormat: 'd.m.Y', locale: flatpickr.l10ns.az, allowInput: true });
             });
             function syncExecutorSelects($modal) {
                 var $main = $modal.find('select[name="main_executor_ids[]"]');
@@ -766,7 +766,7 @@
 
                             if (log.approval_status) {
                                 var map = { approved: 'bg-success', pending: 'bg-warning text-dark', rejected: 'bg-danger', partial: 'bg-info text-dark' };
-                                var labels = { approved: 'İcra olunub ✓', pending: 'Təsdiq gözləyir', rejected: 'Rədd edilib', partial: 'Natamam' };
+                                var labels = { approved: 'İcra olunub ✓', pending: 'Təsdiq gözləyir', rejected: 'İmtina edilib', partial: 'Natamam' };
                                 h += '<div class="mt-1"><span class="badge ' + (map[log.approval_status] || 'bg-secondary') + '">' + (labels[log.approval_status] || log.approval_status) + '</span></div>';
                             }
                             if (log.approved_by) {

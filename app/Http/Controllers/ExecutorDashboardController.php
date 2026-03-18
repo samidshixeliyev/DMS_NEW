@@ -149,7 +149,7 @@ class ExecutorDashboardController extends Controller
                 } elseif ($myIsPending) {
                     $statusHtml = '<span class="badge bg-warning text-dark">Təsdiq gözləyir</span>';
                 } elseif ($myIsRejected) {
-                    $statusHtml = '<span class="badge bg-danger">Rədd edilib</span>';
+                    $statusHtml = '<span class="badge bg-danger">İmtina edilib</span>';
                     if ($myLatestLog->approval_note)
                         $statusHtml .= '<br><small class="text-danger">' . e(Str::limit($myLatestLog->approval_note, 30)) . '</small>';
                 } else {

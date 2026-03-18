@@ -66,6 +66,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('departments', [DepartmentController::class, 'index'])->name('departments.index');
+    Route::post('departments/load', [DepartmentController::class, 'load'])->name('departments.load');
     Route::get('departments/{department}', [DepartmentController::class, 'show'])->name('departments.show');
     Route::get('departments/{department}/edit', [DepartmentController::class, 'edit'])->name('departments.edit');
     Route::middleware('role:admin,manager')->group(function () {
