@@ -542,6 +542,43 @@
     <script src="../../js/mammoth.browser.min.js"></script>
     <script src="{{ asset('js/document-preview.js') }}"></script>
     <script>
+        function syncExecutorSelects($modal) {
+            var $main = $modal.find('select[name="main_executor_ids[]"]');
+            var $helper = $modal.find('select[name="helper_executor_ids[]"]');
+
+            function sync() {
+                var mainVals = ($main.val() || []).map(String);
+                var helperVals = ($helper.val() || []).map(String);
+
+                $helper.find('option').each(function () {
+                    $(this).prop('disabled', mainVals.indexOf(this.value) !== -1);
+                });
+                $main.find('option').each(function () {
+                    $(this).prop('disabled', helperVals.indexOf(this.value) !== -1);
+                });
+
+                $main.trigger('change.select2');
+                $helper.trigger('change.select2');
+            }
+
+            $main.on('change', sync);
+            $helper.on('change', sync);
+            sync();
+        }
+
+        function guardExecutorOverlap($modal) {
+            $modal.find('form').on('submit', function (e) {
+                var main = ($modal.find('select[name="main_executor_ids[]"]').val() || []).map(String);
+                var helper = ($modal.find('select[name="helper_executor_ids[]"]').val() || []).map(String);
+                var overlap = main.filter(function (v) { return helper.indexOf(v) !== -1; });
+                if (overlap.length > 0) {
+                    e.preventDefault();
+                    alert('Eyni icraçı həm əsas həm də digər ola bilməz.');
+                    return false;
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
 
             var $p = $('.container-fluid');
@@ -644,41 +681,6 @@
             $cm.find('.modal-datepicker').each(function () {
                 flatpickr(this, { dateFormat: 'd.m.Y', locale: flatpickr.l10ns.az, allowInput: true });
             });
-            function syncExecutorSelects($modal) {
-                var $main = $modal.find('select[name="main_executor_ids[]"]');
-                var $helper = $modal.find('select[name="helper_executor_ids[]"]');
-
-                function sync() {
-                    var mainVals = ($main.val() || []).map(String);
-                    var helperVals = ($helper.val() || []).map(String);
-
-                    $helper.find('option').each(function () {
-                        $(this).prop('disabled', mainVals.indexOf(this.value) !== -1);
-                    });
-                    $main.find('option').each(function () {
-                        $(this).prop('disabled', helperVals.indexOf(this.value) !== -1);
-                    });
-
-                    $main.trigger('change.select2');
-                    $helper.trigger('change.select2');
-                }
-
-                $main.on('change', sync);
-                $helper.on('change', sync);
-                sync();
-            }
-            function guardExecutorOverlap($modal) {
-                $modal.find('form').on('submit', function (e) {
-                    var main = ($modal.find('select[name="main_executor_ids[]"]').val() || []).map(String);
-                    var helper = ($modal.find('select[name="helper_executor_ids[]"]').val() || []).map(String);
-                    var overlap = main.filter(function (v) { return helper.indexOf(v) !== -1; });
-                    if (overlap.length > 0) {
-                        e.preventDefault();
-                        showToast('Eyni icraçı həm əsas həm də digər ola bilməz.', 'danger');
-                        return false;
-                    }
-                });
-            }
 
             guardExecutorOverlap($cm);
             syncExecutorSelects($cm);
@@ -878,6 +880,7 @@
                 f.submit();
             }
         }
+
         async function toggleProof(id) {
             try {
                 var res = await fetch('/legal-acts/' + id + '/toggle-proof', {

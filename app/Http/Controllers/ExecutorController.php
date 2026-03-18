@@ -10,9 +10,59 @@ class ExecutorController extends Controller
 {
     public function index()
     {
-        $executors = Executor::with('department')->active()->paginate(20);
         $departments = Department::active()->get();
-        return view('executors.index', compact('executors', 'departments'));
+        return view('executors.index', compact('departments'));
+    }
+
+    public function load(Request $request)
+    {
+        $draw = $request->input('draw', 1);
+        $start = $request->input('start', 0);
+        $length = $request->input('length', 25);
+
+        $totalRecords = Executor::active()->count();
+
+        $query = Executor::with('department')->active();
+
+        $search = $request->input('search.value');
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                  ->orWhere('position', 'like', '%' . $search . '%')
+                  ->orWhereHas('department', fn($dq) => $dq->where('name', 'like', '%' . $search . '%'));
+            });
+        }
+
+        $filteredRecords = (clone $query)->count();
+
+        $orderCol = (int) $request->input('order.0.column', 0);
+        $orderDir = $request->input('order.0.dir', 'asc') === 'asc' ? 'asc' : 'desc';
+        match ($orderCol) {
+            0 => $query->orderBy('id', $orderDir),
+            1 => $query->orderBy('name', $orderDir),
+            2 => $query->orderBy('position', $orderDir),
+            default => $query->orderBy('id', 'desc'),
+        };
+
+        $results = $query->skip($start)->take($length)->get();
+
+        $data = [];
+        foreach ($results as $i => $item) {
+            $data[] = [
+                'id' => $item->id,
+                'rowNum' => $start + $i + 1,
+                'name' => $item->name,
+                'position' => $item->position ?? '-',
+                'department' => $item->department?->name ?? '-',
+            ];
+        }
+
+        return response()->json([
+            'draw' => (int) $draw,
+            'recordsTotal' => $totalRecords,
+            'recordsFiltered' => $filteredRecords,
+            'data' => $data,
+        ]);
     }
 
     public function store(Request $request)

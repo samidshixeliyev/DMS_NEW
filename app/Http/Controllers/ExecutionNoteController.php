@@ -9,8 +9,51 @@ class ExecutionNoteController extends Controller
 {
     public function index()
     {
-        $executionNotes = ExecutionNote::active()->paginate(20);
-        return view('execution_notes.index', compact('executionNotes'));
+        return view('execution_notes.index');
+    }
+
+    public function load(Request $request)
+    {
+        $draw = $request->input('draw', 1);
+        $start = $request->input('start', 0);
+        $length = $request->input('length', 25);
+
+        $totalRecords = ExecutionNote::active()->count();
+
+        $query = ExecutionNote::active();
+
+        $search = $request->input('search.value');
+        if ($search) {
+            $query->where('note', 'like', '%' . $search . '%');
+        }
+
+        $filteredRecords = (clone $query)->count();
+
+        $orderCol = (int) $request->input('order.0.column', 0);
+        $orderDir = $request->input('order.0.dir', 'asc') === 'asc' ? 'asc' : 'desc';
+        match ($orderCol) {
+            0 => $query->orderBy('id', $orderDir),
+            1 => $query->orderBy('note', $orderDir),
+            default => $query->orderBy('id', 'desc'),
+        };
+
+        $results = $query->skip($start)->take($length)->get();
+
+        $data = [];
+        foreach ($results as $i => $item) {
+            $data[] = [
+                'id' => $item->id,
+                'rowNum' => $start + $i + 1,
+                'note' => \Illuminate\Support\Str::limit($item->note, 100),
+            ];
+        }
+
+        return response()->json([
+            'draw' => (int) $draw,
+            'recordsTotal' => $totalRecords,
+            'recordsFiltered' => $filteredRecords,
+            'data' => $data,
+        ]);
     }
 
     public function store(Request $request)

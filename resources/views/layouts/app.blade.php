@@ -324,6 +324,13 @@
 
             <div class="sidebar-footer"
                 style="border-top:1px solid rgba(255,255,255,0.1); padding:0.75rem; position:relative; z-index:1;">
+                <button type="button" onclick="document.getElementById('changePasswordModal') && new bootstrap.Modal(document.getElementById('changePasswordModal')).show()"
+                    style="display:flex; align-items:center; gap:0.5rem; width:100%; padding:0.5rem 0.75rem; border-radius:8px; font-size:0.85rem; font-weight:600; color:#48cae4; background:transparent; border:none; cursor:pointer; transition:all 0.2s; margin-bottom:4px;"
+                    onmouseover="this.style.background='rgba(0,180,216,0.12)'"
+                    onmouseout="this.style.background='transparent'">
+                    <i class="bi bi-key" style="font-size:1rem;"></i>
+                    <span class="btn-text sidebar-text">Şifrəni dəyiş</span>
+                </button>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit"
@@ -367,6 +374,39 @@
             <footer style="border-top:1px solid #e2e8f0; background:#fff; padding:0.6rem 1.5rem; text-align:center;">
                 <p style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin:0;">&copy; {{ date('Y') }} DMS &mdash; Sənəd İdarəetmə Sistemi</p>
             </footer>
+        </div>
+    </div>
+
+    {{-- Change Password Modal --}}
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('change-password') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-key me-2"></i>Şifrəni dəyiş</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Cari şifrə <span class="text-danger">*</span></label>
+                            <input type="password" name="current_password" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Yeni şifrə <span class="text-danger">*</span></label>
+                            <input type="password" name="password" class="form-control" required minlength="6">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Yeni şifrə təkrarı <span class="text-danger">*</span></label>
+                            <input type="password" name="password_confirmation" class="form-control" required minlength="6">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İmtina</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Dəyiş</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -455,6 +495,12 @@
             searching: function () { return 'Axtarılır...'; },
             removeAllItems: function () { return 'Hamısını sil'; }
         });
+
+        @if($errors->has('current_password') || $errors->has('password'))
+        document.addEventListener('DOMContentLoaded', function() {
+            new bootstrap.Modal(document.getElementById('changePasswordModal')).show();
+        });
+        @endif
     </script>
 
     @stack('scripts')

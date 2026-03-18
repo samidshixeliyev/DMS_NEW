@@ -26,6 +26,8 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('legal-acts.index');
     });
 
+    Route::post('change-password', [UserController::class, 'changePassword'])->name('change-password');
+
     Route::middleware('role:executor,admin,manager')->group(function () {
         Route::get('executor/dashboard', [ExecutorDashboardController::class, 'index'])->name('executor.index');
         Route::post('executor/dashboard/load', [ExecutorDashboardController::class, 'load'])->name('executor.load');
@@ -57,6 +59,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('act-types', [ActTypeController::class, 'index'])->name('act-types.index');
+    Route::post('act-types/load', [ActTypeController::class, 'load'])->name('act-types.load');
     Route::get('act-types/{actType}', [ActTypeController::class, 'show'])->name('act-types.show');
     Route::get('act-types/{actType}/edit', [ActTypeController::class, 'edit'])->name('act-types.edit');
     Route::middleware('role:admin,manager')->group(function () {
@@ -76,6 +79,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('executors', [ExecutorController::class, 'index'])->name('executors.index');
+    Route::post('executors/load', [ExecutorController::class, 'load'])->name('executors.load');
     Route::get('executors/{executor}', [ExecutorController::class, 'show'])->name('executors.show');
     Route::get('executors/{executor}/edit', [ExecutorController::class, 'edit'])->name('executors.edit');
     Route::middleware('role:admin,manager')->group(function () {
@@ -94,6 +98,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('execution-notes', [ExecutionNoteController::class, 'index'])->name('execution-notes.index');
+    Route::post('execution-notes/load', [ExecutionNoteController::class, 'load'])->name('execution-notes.load');
     Route::get('execution-notes/{executionNote}', [ExecutionNoteController::class, 'show'])->name('execution-notes.show');
     Route::get('execution-notes/{executionNote}/edit', [ExecutionNoteController::class, 'edit'])->name('execution-notes.edit');
     Route::middleware('role:admin,manager')->group(function () {

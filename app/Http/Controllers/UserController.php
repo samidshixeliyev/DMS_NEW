@@ -101,4 +101,27 @@ class UserController extends Controller
 
         return redirect()->route('users.index')->with('success', 'İstifadəçi uğurla silindi.');
     }
+
+    public function changePassword(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+        ], [
+            'current_password.required' => 'Cari şifrə mütləqdir.',
+            'password.required' => 'Yeni şifrə mütləqdir.',
+            'password.min' => 'Yeni şifrə ən azı 6 simvol olmalıdır.',
+            'password.confirmed' => 'Şifrə təkrarı uyğun gəlmir.',
+        ]);
+
+        $user = auth()->user();
+
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return back()->withErrors(['current_password' => 'Cari şifrə yanlışdır.']);
+        }
+
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        return back()->with('success', 'Şifrəniz uğurla dəyişdirildi.');
+    }
 }
