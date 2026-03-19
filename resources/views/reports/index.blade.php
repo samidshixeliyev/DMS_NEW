@@ -157,7 +157,7 @@
         <div class="stat-card">
             <div class="d-flex align-items-center gap-2 mb-1">
                 <div class="stat-dot" style="background:#dc2626;"></div>
-                <div class="stat-label">Rədd edilib</div>
+                <div class="stat-label">İmtina edilib</div>
             </div>
             <div class="stat-value" id="statRejected" style="color:#dc2626;">-</div>
         </div>
@@ -220,7 +220,7 @@
                         <th>Cəmi</th>
                         <th>İcra olunub</th>
                         <th>Təsdiq gözləyir</th>
-                        <th>Rədd edilib</th>
+                        <th>İmtina edilib</th>
                         <th>İcradadır</th>
                         <th>Başlanmayıb</th>
                         <th>Müddəti keçib</th>
@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [
                     { label: 'İcra olunub', data: filtered.map(function(s) { return s.executed; }), backgroundColor: '#059669', borderRadius: 3 },
                     { label: 'Təsdiq gözləyir', data: filtered.map(function(s) { return s.pending; }), backgroundColor: '#d97706', borderRadius: 3 },
-                    { label: 'Rədd edilib', data: filtered.map(function(s) { return s.rejected; }), backgroundColor: '#dc2626', borderRadius: 3 },
+                    { label: 'İmtina edilib', data: filtered.map(function(s) { return s.rejected; }), backgroundColor: '#dc2626', borderRadius: 3 },
                     { label: 'İcradadır', data: filtered.map(function(s) { return s.in_progress; }), backgroundColor: '#0284c7', borderRadius: 3 },
                     { label: 'Başlanmayıb', data: filtered.map(function(s) { return s.not_started; }), backgroundColor: '#cbd5e1', borderRadius: 3 },
                 ]
@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderPieChart(totals) {
         document.getElementById('pieLoading').style.display = 'none';
         var values = [totals.executed, totals.pending, totals.rejected, totals.in_progress, totals.not_started];
-        var labels = ['İcra olunub', 'Təsdiq gözləyir', 'Rədd edilib', 'İcradadır', 'Başlanmayıb'];
+        var labels = ['İcra olunub', 'Təsdiq gözləyir', 'İmtina edilib', 'İcradadır', 'Başlanmayıb'];
         var colors = ['#059669', '#d97706', '#dc2626', '#0284c7', '#cbd5e1'];
 
         var config = {
