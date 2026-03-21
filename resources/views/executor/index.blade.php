@@ -279,8 +279,7 @@
                             <input type="file" name="attachments[]" id="attachmentsInput" class="form-control"
                                 accept=".doc,.docx,.pdf,.jpg,.jpeg,.png" multiple>
                             <div class="form-text text-warning" id="attachmentWarning" style="display:none;">
-                                <i class="bi bi-exclamation-triangle me-1"></i> "İcra olunub" statusunda ən azı bir sübut
-                                sənəd məcburidir!
+                                <i class="bi bi-exclamation-triangle me-1"></i> "İcra olunub" statusunda Admin tərəfindən sübut sənədi tələb olunarsa, sənəd əlavə etmək məcburidir.
                             </div>
                             <ul class="file-list" id="fileList"></ul>
                         </div>
