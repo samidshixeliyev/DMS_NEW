@@ -137,6 +137,11 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    var $cm = $('#createModal');
+    $cm.find('select').each(function () {
+        $(this).select2({ theme: 'bootstrap-5', dropdownParent: $cm, placeholder: 'Seç', allowClear: true, width: '100%' });
+    });
+
     $('#executorsTable').DataTable({
         processing: true, serverSide: true,
         ajax: { url: "{{ route('executors.load') }}", type: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken } },
@@ -187,6 +192,13 @@ async function editRecord(id) {
         });
     }
     document.getElementById('editForm').action = '/executors/' + id;
+
+    var $em = $('#editModal');
+    $em.find('select').each(function () {
+        if ($(this).hasClass('select2-hidden-accessible')) $(this).select2('destroy');
+        $(this).select2({ theme: 'bootstrap-5', dropdownParent: $em, placeholder: 'Seç', allowClear: true, width: '100%' });
+    });
+
     new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 

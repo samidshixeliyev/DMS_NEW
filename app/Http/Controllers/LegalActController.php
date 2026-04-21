@@ -20,13 +20,25 @@ class LegalActController extends Controller
 {
     public function index()
     {
-        $actTypes = ActType::active()->get();
-        $issuingAuthorities = IssuingAuthority::active()->get();
-        $executors = Executor::with('department')->active()->get();
-        $executionNotes = ExecutionNote::active()->get();
-        $departments = Department::active()->get();
-        $canManage = auth()->user()->canManage();
-        $isAdmin = auth()->user()->isAdmin();
+        $user      = auth()->user();
+        $canManage = $user->canManage();
+        $canAssign = $user->canAssignTasks();
+        $isAdmin   = $user->isAdmin();
+
+        $actTypes            = ActType::active()->get();
+        $issuingAuthorities  = IssuingAuthority::active()->get();
+        $executionNotes      = ExecutionNote::active()->get();
+        $departments         = Department::active()->get();
+
+        // Executors available for assignment — restricted by hierarchy for dept users
+        if ($canManage) {
+            $executors = Executor::with('department')->active()->get();
+        } elseif ($canAssign && $user->department_id) {
+            $deptIds   = Department::descendantIdsOf($user->department_id);
+            $executors = Executor::with('department')->active()->whereIn('department_id', $deptIds)->get();
+        } else {
+            $executors = collect();
+        }
 
         $pendingApprovalCount = 0;
         if ($canManage) {
@@ -45,6 +57,7 @@ class LegalActController extends Controller
             'executionNotes',
             'departments',
             'canManage',
+            'canAssign',
             'isAdmin',
             'pendingApprovalCount'
         ));
@@ -52,22 +65,13 @@ class LegalActController extends Controller
 
     public function load(Request $request)
     {
-        $draw = $request->input('draw', 1);
+        $draw  = $request->input('draw', 1);
         $start = $request->input('start', 0);
         $length = $request->input('length', 25);
-        $user = auth()->user();
+        $user  = auth()->user();
 
         $totalQuery = LegalAct::active();
-        if (!$user->canManage()) {
-            $totalQuery->where(function ($q) use ($user) {
-                if ($user->executor_id) {
-                    $q->whereHas('executors', fn($sq) => $sq->where('executors.id', $user->executor_id));
-                }
-                if ($user->department_id) {
-                    $q->orWhereHas('executors', fn($sq) => $sq->where('executors.department_id', $user->department_id));
-                }
-            });
-        }
+        $this->applyVisibilityScope($totalQuery, $user);
         $totalRecords = (clone $totalQuery)->count();
 
         $query = $this->applyFilters($request);
@@ -86,15 +90,15 @@ class LegalActController extends Controller
             default => $query->orderBy('id', 'desc'),
         };
 
-        $results = $query->skip($start)->take($length)->get();
-
-        $userId = auth()->id();
+        $results  = $query->skip($start)->take($length)->get();
+        $userId   = auth()->id();
         $canManage = $user->canManage();
-        $isAdmin = $user->isAdmin();
+        $canAssign = $user->canAssignTasks();
+        $isAdmin  = $user->isAdmin();
 
         $data = [];
         foreach ($results as $i => $act) {
-            $mainExecutors = $act->executors->where('pivot.role', 'main')->values();
+            $mainExecutors   = $act->executors->where('pivot.role', 'main')->values();
             $helperExecutors = $act->executors->where('pivot.role', 'helper')->values();
 
             $executorsToShow = [];
@@ -129,20 +133,20 @@ class LegalActController extends Controller
                 }
             }
 
-            $noteHtml = '-';
+            $noteHtml    = '-';
             $allApproved = true;
-            $anyPending = false;
-            $anyPartial = false;
+            $anyPending  = false;
+            $anyPartial  = false;
             $anyRejected = false;
 
             if (count($executorsToShow) > 0) {
                 $noteHtml = '';
                 foreach ($executorsToShow as $idx => $entry) {
-                    $executor = $entry['executor'];
-                    $label = $entry['label'];
+                    $executor    = $entry['executor'];
+                    $label       = $entry['label'];
                     $executorLog = $executorLogMap[$executor->id] ?? null;
-                    $status = $executorLog?->approval_status;
-                    $logNote = $executorLog?->executionNote?->note ?? '';
+                    $status      = $executorLog?->approval_status;
+                    $logNote     = $executorLog?->executionNote?->note ?? '';
 
                     if ($status !== ExecutorStatusLog::APPROVAL_APPROVED)
                         $allApproved = false;
@@ -162,9 +166,9 @@ class LegalActController extends Controller
                     if ($executorLog) {
                         $noteHtml .= match ($status) {
                             ExecutorStatusLog::APPROVAL_APPROVED => '<span class="badge bg-success">İcra olunub ✓</span>',
-                            ExecutorStatusLog::APPROVAL_PENDING => '<span class="badge bg-warning text-dark">Təsdiq gözləyir</span>',
+                            ExecutorStatusLog::APPROVAL_PENDING  => '<span class="badge bg-warning text-dark">Təsdiq gözləyir</span>',
                             ExecutorStatusLog::APPROVAL_REJECTED => '<span class="badge bg-danger">İmtina edilib</span>',
-                            ExecutorStatusLog::APPROVAL_PARTIAL => '<span class="badge bg-info text-dark">Natamam</span>',
+                            ExecutorStatusLog::APPROVAL_PARTIAL  => '<span class="badge bg-info text-dark">Natamam</span>',
                             default => '<span class="badge bg-secondary">' . e(Str::limit($logNote ?: 'İcradadır', 25)) . '</span>',
                         };
                     } else {
@@ -211,60 +215,68 @@ class LegalActController extends Controller
             }
 
             $data[] = [
-                'DT_RowClass' => $rowClass,
-                'id' => $act->id,
-                'rowNum' => $start + $i + 1,
-                'actType' => $act->actType?->name ?? '-',
-                'legalActNumber' => $act->legal_act_number ?? '-',
-                'legalActDate' => $act->legal_act_date?->format('d.m.Y') ?? '-',
+                'DT_RowClass'      => $rowClass,
+                'id'               => $act->id,
+                'rowNum'           => $start + $i + 1,
+                'actType'          => $act->actType?->name ?? '-',
+                'legalActNumber'   => $act->legal_act_number ?? '-',
+                'legalActDate'     => $act->legal_act_date?->format('d.m.Y') ?? '-',
                 'issuingAuthority' => $act->issuingAuthority?->name ?? '-',
-                'summary' => Str::limit($act->summary, 80) ?? '-',
-                'taskNumber' => $act->task_number ?? '-',
-                'taskDescription' => Str::limit($act->task_description, 60) ?: '-',
-                'executor' => $executorHtml,
-                'department' => $departmentHtml,
-                'deadlineHtml' => $deadlineHtml,
-                'noteHtml' => $noteHtml,
+                'summary'          => Str::limit($act->summary, 80) ?? '-',
+                'taskNumber'       => $act->task_number ?? '-',
+                'taskDescription'  => Str::limit($act->task_description, 60) ?: '-',
+                'executor'         => $executorHtml,
+                'department'       => $departmentHtml,
+                'deadlineHtml'     => $deadlineHtml,
+                'noteHtml'         => $noteHtml,
                 'relatedDocNumber' => $act->related_document_number ?? '-',
-                'relatedDocDate' => $act->related_document_date?->format('d.m.Y') ?? '-',
-                'insertedUser' => $act->insertedUser ? $act->insertedUser->name . ' ' . $act->insertedUser->surname : '-',
-                'canEdit' => ($userId === $act->inserted_user_id) || $canManage,
-                'canDelete' => $isAdmin,
+                'relatedDocDate'   => $act->related_document_date?->format('d.m.Y') ?? '-',
+                'insertedUser'     => $act->insertedUser ? $act->insertedUser->name . ' ' . $act->insertedUser->surname : '-',
+                'canEdit'          => ($userId === $act->inserted_user_id) || $canManage,
+                'canDelete'        => $isAdmin,
                 'hasPendingApproval' => $anyPending,
-                'pendingLogId' => $pendingLogId,
-                'proofRequired' => (bool) $act->proof_required,
+                'pendingLogId'     => $pendingLogId,
+                'proofRequired'    => (bool) $act->proof_required,
             ];
         }
 
         return response()->json([
-            'draw' => (int) $draw,
-            'recordsTotal' => $totalRecords,
+            'draw'            => (int) $draw,
+            'recordsTotal'    => $totalRecords,
             'recordsFiltered' => $filteredRecords,
-            'data' => $data,
+            'data'            => $data,
         ]);
     }
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+
+        if (!$user->canAssignTasks()) {
+            abort(403, 'Tapşırıq yaratmaq icazəniz yoxdur.');
+        }
+
         $validated = $request->validate([
-            'act_type_id' => 'required|exists:act_types,id',
-            'issued_by_id' => 'required|exists:issuing_authorities,id',
-            'main_executor_ids' => 'required|array|min:1',
+            'act_type_id'         => 'required|exists:act_types,id',
+            'issued_by_id'        => 'required|exists:issuing_authorities,id',
+            'main_executor_ids'   => 'required|array|min:1',
             'main_executor_ids.*' => 'required|exists:executors,id',
-            'helper_executor_ids' => 'nullable|array',
+            'helper_executor_ids'   => 'nullable|array',
             'helper_executor_ids.*' => 'required|exists:executors,id',
-            'legal_act_number' => 'required|string|max:255',
-            'legal_act_date' => 'required|date',
-            'summary' => 'required|string',
-            'task_number' => 'nullable|string|max:255',
-            'task_description' => 'nullable|string',
-            'execution_deadline' => 'nullable|date',
+            'executor_tasks'      => 'nullable|array',
+            'executor_tasks.*'    => 'nullable|string|max:5000',
+            'legal_act_number'    => 'required|string|max:255',
+            'legal_act_date'      => 'required|date',
+            'summary'             => 'required|string',
+            'task_number'         => 'nullable|string|max:255',
+            'task_description'    => 'nullable|string',
+            'execution_deadline'  => 'nullable|date',
             'related_document_number' => 'nullable|string|max:255',
-            'related_document_date' => 'nullable|date',
-            'proof_required' => 'nullable|boolean',
+            'related_document_date'   => 'nullable|date',
+            'proof_required'      => 'nullable|boolean',
         ], $this->validationMessages());
 
-        $year = Carbon::parse($validated['legal_act_date'])->year;
+        $year   = Carbon::parse($validated['legal_act_date'])->year;
         $exists = LegalAct::where('act_type_id', $validated['act_type_id'])
             ->where('legal_act_number', $validated['legal_act_number'])
             ->whereYear('legal_act_date', $year)
@@ -275,24 +287,42 @@ class LegalActController extends Controller
             return back()->withErrors(['legal_act_number' => 'Bu akt növü və il üzrə eyni nömrəli hüquqi akt artıq mövcuddur.'])->withInput();
         }
 
-        $mainIds = array_unique(array_map('intval', $validated['main_executor_ids']));
+        $mainIds   = array_unique(array_map('intval', $validated['main_executor_ids']));
         $helperIds = array_unique(array_map('intval', $validated['helper_executor_ids'] ?? []));
 
         if (array_intersect($mainIds, $helperIds)) {
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
-        $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids'])->toArray();
+        // Dept-level users can only assign to their own subtree
+        if (!$user->canManage() && $user->department_id) {
+            $allowedDeptIds = Department::descendantIdsOf($user->department_id);
+            $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
+                ->whereNotIn('department_id', $allowedDeptIds)
+                ->exists();
+            if ($forbidden) {
+                return back()->withErrors(['main_executor_ids' => 'Yalnız öz idarənizə və alt-idarələrə tapşırıq verə bilərsiniz.'])->withInput();
+            }
+        }
+
+        $executorTasks = $validated['executor_tasks'] ?? [];
+        $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids', 'executor_tasks'])->toArray();
         $actData['inserted_user_id'] = auth()->id();
-        $actData['proof_required'] = $request->boolean('proof_required') ? 1 : 0;
+        $actData['proof_required']   = $request->boolean('proof_required') ? 1 : 0;
 
         $legalAct = LegalAct::create($actData);
 
         foreach ($mainIds as $id) {
-            $legalAct->executors()->attach($id, ['role' => 'main']);
+            $legalAct->executors()->attach($id, [
+                'role'             => 'main',
+                'task_description' => $executorTasks[$id] ?? null,
+            ]);
         }
         foreach ($helperIds as $id) {
-            $legalAct->executors()->attach($id, ['role' => 'helper']);
+            $legalAct->executors()->attach($id, [
+                'role'             => 'helper',
+                'task_description' => $executorTasks[$id] ?? null,
+            ]);
         }
 
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla yaradıldı.');
@@ -301,9 +331,9 @@ class LegalActController extends Controller
     public function show(LegalAct $legalAct)
     {
         $user = auth()->user();
-        if ($user->role === 'executor') {
-            if (!$legalAct->executors()->where('executor_id', $user->executor_id)->exists())
-                abort(403);
+
+        if (!$user->canManage() && !$this->userCanViewAct($legalAct, $user)) {
+            abort(403);
         }
 
         $legalAct->load([
@@ -317,50 +347,63 @@ class LegalActController extends Controller
             'insertedUser',
         ]);
 
-        $mainExecutors = $legalAct->executors->where('pivot.role', 'main')->values();
+        $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
         $helperExecutors = $legalAct->executors->where('pivot.role', 'helper')->values();
 
+        // Build executor list with per-executor task_description
+        // Admin/manager sees all; dept users see the global task (private tasks stay private)
+        $viewerDeptIds = $user->canManage() ? null
+            : ($user->department_id ? Department::descendantIdsOf($user->department_id) : []);
+
+        $mapExecutor = function ($e) use ($user, $viewerDeptIds) {
+            $privateTask = null;
+            if ($user->canManage()) {
+                // Managers see every executor's private task
+                $privateTask = $e->pivot->task_description;
+            } elseif ($viewerDeptIds && in_array($e->department_id, $viewerDeptIds)) {
+                // Dept user sees private task only for their own subtree's executors
+                $privateTask = $e->pivot->task_description;
+            }
+            return [
+                'id'           => $e->id,
+                'name'         => $e->name,
+                'position'     => $e->position,
+                'department'   => $e->department?->name,
+                'task_description' => $privateTask,
+            ];
+        };
+
         return response()->json([
-            'id' => $legalAct->id,
-            'act_type' => $legalAct->actType?->name,
-            'legal_act_number' => $legalAct->legal_act_number,
-            'legal_act_date' => $legalAct->legal_act_date?->format('d.m.Y'),
-            'summary' => $legalAct->summary,
-            'issuing_authority' => $legalAct->issuingAuthority?->name,
-            'main_executors' => $mainExecutors->map(fn($e) => [
-                'id' => $e->id,
-                'name' => $e->name,
-                'position' => $e->position,
-                'department' => $e->department?->name,
-            ]),
-            'helper_executors' => $helperExecutors->map(fn($e) => [
-                'id' => $e->id,
-                'name' => $e->name,
-                'position' => $e->position,
-                'department' => $e->department?->name,
-            ]),
-            'task_number' => $legalAct->task_number,
-            'task_description' => $legalAct->task_description,
-            'execution_deadline' => $legalAct->execution_deadline?->format('d.m.Y'),
+            'id'                  => $legalAct->id,
+            'act_type'            => $legalAct->actType?->name,
+            'legal_act_number'    => $legalAct->legal_act_number,
+            'legal_act_date'      => $legalAct->legal_act_date?->format('d.m.Y'),
+            'summary'             => $legalAct->summary,
+            'issuing_authority'   => $legalAct->issuingAuthority?->name,
+            'main_executors'      => $mainExecutors->map($mapExecutor),
+            'helper_executors'    => $helperExecutors->map($mapExecutor),
+            'task_number'         => $legalAct->task_number,
+            'task_description'    => $legalAct->task_description,
+            'execution_deadline'  => $legalAct->execution_deadline?->format('d.m.Y'),
             'related_document_number' => $legalAct->related_document_number,
-            'related_document_date' => $legalAct->related_document_date?->format('d.m.Y'),
-            'proof_required' => (bool) $legalAct->proof_required,
-            'inserted_user' => $legalAct->insertedUser
+            'related_document_date'   => $legalAct->related_document_date?->format('d.m.Y'),
+            'proof_required'      => (bool) $legalAct->proof_required,
+            'inserted_user'       => $legalAct->insertedUser
                 ? $legalAct->insertedUser->name . ' ' . $legalAct->insertedUser->surname : null,
-            'created_at' => $legalAct->created_at?->format('d.m.Y H:i'),
-            'status_logs' => $legalAct->statusLogs->map(fn($log) => [
-                'user' => $log->user?->full_name,
-                'executor_id' => $log->user?->executor_id,
-                'note' => $log->executionNote?->note,
-                'custom_note' => $log->custom_note,
-                'date' => $log->created_at?->format('d.m.Y H:i'),
+            'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
+            'status_logs'         => $legalAct->statusLogs->map(fn($log) => [
+                'user'            => $log->user?->full_name,
+                'executor_id'     => $log->user?->executor_id,
+                'note'            => $log->executionNote?->note,
+                'custom_note'     => $log->custom_note,
+                'date'            => $log->created_at?->format('d.m.Y H:i'),
                 'approval_status' => $log->approval_status,
-                'approval_note' => $log->approval_note,
-                'approved_by' => $log->approvedByUser?->full_name,
-                'approved_at' => $log->approved_at?->format('d.m.Y H:i'),
-                'attachments' => $log->attachments->map(fn($a) => [
-                    'id' => $a->id,
-                    'name' => $a->original_name,
+                'approval_note'   => $log->approval_note,
+                'approved_by'     => $log->approvedByUser?->full_name,
+                'approved_at'     => $log->approved_at?->format('d.m.Y H:i'),
+                'attachments'     => $log->attachments->map(fn($a) => [
+                    'id'        => $a->id,
+                    'name'      => $a->original_name,
                     'mime_type' => $a->mime_type,
                 ]),
             ]),
@@ -370,59 +413,84 @@ class LegalActController extends Controller
     public function edit(LegalAct $legalAct)
     {
         $user = auth()->user();
-        if ($user->role === 'executor') {
-            if (!$legalAct->executors()->where('executor_id', $user->executor_id)->exists())
-                abort(403);
+
+        if (!$user->canManage() && auth()->id() !== $legalAct->inserted_user_id) {
+            abort(403);
         }
 
-        $legalAct->load('executors');
+        $legalAct->load('executors.department');
+
+        // Build executor list filtered by what this user may assign
+        if ($user->canManage()) {
+            $executors = Executor::with('department')->active()->get();
+        } elseif ($user->department_id) {
+            $deptIds   = Department::descendantIdsOf($user->department_id);
+            $executors = Executor::with('department')->active()->whereIn('department_id', $deptIds)->get();
+        } else {
+            $executors = collect();
+        }
+
+        // Per-executor task descriptions currently saved on this act
+        $executorTasks = [];
+        foreach ($legalAct->executors as $e) {
+            $executorTasks[$e->id] = $e->pivot->task_description;
+        }
 
         return response()->json([
-            'id' => $legalAct->id,
-            'act_type_id' => $legalAct->act_type_id,
-            'issued_by_id' => $legalAct->issued_by_id,
-            'main_executor_ids' => $legalAct->executors->where('pivot.role', 'main')->pluck('id')->values(),
+            'id'               => $legalAct->id,
+            'act_type_id'      => $legalAct->act_type_id,
+            'issued_by_id'     => $legalAct->issued_by_id,
+            'main_executor_ids'   => $legalAct->executors->where('pivot.role', 'main')->pluck('id')->values(),
             'helper_executor_ids' => $legalAct->executors->where('pivot.role', 'helper')->pluck('id')->values(),
+            'executor_tasks'   => $executorTasks,
             'legal_act_number' => $legalAct->legal_act_number,
-            'legal_act_date' => $legalAct->legal_act_date?->format('Y-m-d'),
-            'summary' => $legalAct->summary,
-            'task_number' => $legalAct->task_number,
+            'legal_act_date'   => $legalAct->legal_act_date?->format('Y-m-d'),
+            'summary'          => $legalAct->summary,
+            'task_number'      => $legalAct->task_number,
             'task_description' => $legalAct->task_description,
-            'execution_deadline' => $legalAct->execution_deadline?->format('Y-m-d'),
+            'execution_deadline'      => $legalAct->execution_deadline?->format('Y-m-d'),
             'related_document_number' => $legalAct->related_document_number,
-            'related_document_date' => $legalAct->related_document_date?->format('Y-m-d'),
-            'proof_required' => (bool) $legalAct->proof_required,
-            'act_types' => ActType::active()->get(),
-            'authorities' => IssuingAuthority::active()->get(),
-            'executors' => Executor::with('department')->active()->get(),
+            'related_document_date'   => $legalAct->related_document_date?->format('Y-m-d'),
+            'proof_required'   => (bool) $legalAct->proof_required,
+            'act_types'        => ActType::active()->get(),
+            'authorities'      => IssuingAuthority::active()->get(),
+            'executors'        => $executors->map(fn($e) => [
+                'id'         => $e->id,
+                'name'       => $e->name,
+                'department' => $e->department ? ['id' => $e->department->id, 'name' => $e->department->name] : null,
+            ]),
         ]);
     }
 
     public function update(Request $request, LegalAct $legalAct)
     {
-        if (!auth()->user()->canManage() && auth()->id() !== $legalAct->inserted_user_id) {
+        $user = auth()->user();
+
+        if (!$user->canManage() && auth()->id() !== $legalAct->inserted_user_id) {
             abort(403, 'Sizin bu əməliyyat üçün icazəniz yoxdur.');
         }
 
         $validated = $request->validate([
-            'act_type_id' => 'required|exists:act_types,id',
-            'issued_by_id' => 'required|exists:issuing_authorities,id',
-            'main_executor_ids' => 'required|array|min:1',
+            'act_type_id'         => 'required|exists:act_types,id',
+            'issued_by_id'        => 'required|exists:issuing_authorities,id',
+            'main_executor_ids'   => 'required|array|min:1',
             'main_executor_ids.*' => 'required|exists:executors,id',
-            'helper_executor_ids' => 'nullable|array',
+            'helper_executor_ids'   => 'nullable|array',
             'helper_executor_ids.*' => 'required|exists:executors,id',
-            'legal_act_number' => 'required|string|max:255',
-            'legal_act_date' => 'required|date',
-            'summary' => 'required|string',
-            'task_number' => 'nullable|string|max:255',
-            'task_description' => 'nullable|string',
-            'execution_deadline' => 'nullable|date',
+            'executor_tasks'      => 'nullable|array',
+            'executor_tasks.*'    => 'nullable|string|max:5000',
+            'legal_act_number'    => 'required|string|max:255',
+            'legal_act_date'      => 'required|date',
+            'summary'             => 'required|string',
+            'task_number'         => 'nullable|string|max:255',
+            'task_description'    => 'nullable|string',
+            'execution_deadline'  => 'nullable|date',
             'related_document_number' => 'nullable|string|max:255',
-            'related_document_date' => 'nullable|date',
-            'proof_required' => 'nullable|boolean',
+            'related_document_date'   => 'nullable|date',
+            'proof_required'      => 'nullable|boolean',
         ], $this->validationMessages());
 
-        $year = Carbon::parse($validated['legal_act_date'])->year;
+        $year   = Carbon::parse($validated['legal_act_date'])->year;
         $exists = LegalAct::where('act_type_id', $validated['act_type_id'])
             ->where('legal_act_number', $validated['legal_act_number'])
             ->whereYear('legal_act_date', $year)
@@ -434,24 +502,42 @@ class LegalActController extends Controller
             return back()->withErrors(['legal_act_number' => 'Bu akt növü və il üzrə eyni nömrəli hüquqi akt artıq mövcuddur.'])->withInput();
         }
 
-        $mainIds = array_unique(array_map('intval', $validated['main_executor_ids']));
+        $mainIds   = array_unique(array_map('intval', $validated['main_executor_ids']));
         $helperIds = array_unique(array_map('intval', $validated['helper_executor_ids'] ?? []));
 
         if (array_intersect($mainIds, $helperIds)) {
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
-        $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids'])->toArray();
+        // Dept-level users can only assign to their own subtree
+        if (!$user->canManage() && $user->department_id) {
+            $allowedDeptIds = Department::descendantIdsOf($user->department_id);
+            $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
+                ->whereNotIn('department_id', $allowedDeptIds)
+                ->exists();
+            if ($forbidden) {
+                return back()->withErrors(['main_executor_ids' => 'Yalnız öz idarənizə və alt-idarələrə tapşırıq verə bilərsiniz.'])->withInput();
+            }
+        }
+
+        $executorTasks = $validated['executor_tasks'] ?? [];
+        $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids', 'executor_tasks'])->toArray();
         $actData['proof_required'] = $request->boolean('proof_required') ? 1 : 0;
 
         $legalAct->update($actData);
 
         $legalAct->executors()->detach();
         foreach ($mainIds as $id) {
-            $legalAct->executors()->attach($id, ['role' => 'main']);
+            $legalAct->executors()->attach($id, [
+                'role'             => 'main',
+                'task_description' => $executorTasks[$id] ?? null,
+            ]);
         }
         foreach ($helperIds as $id) {
-            $legalAct->executors()->attach($id, ['role' => 'helper']);
+            $legalAct->executors()->attach($id, [
+                'role'             => 'helper',
+                'task_description' => $executorTasks[$id] ?? null,
+            ]);
         }
 
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla yeniləndi.');
@@ -467,18 +553,18 @@ class LegalActController extends Controller
 
     public function exportExcel(Request $request)
     {
-        $query = $this->applyFilters($request);
+        $query    = $this->applyFilters($request);
         $filename = 'legal_acts_' . now()->format('Y_m_d_His') . '.xls';
         return (new LegalActsExport($query))->download($filename);
     }
 
     public function exportWord(Request $request)
     {
-        $query = $this->applyFilters($request);
+        $query     = $this->applyFilters($request);
         $legalActs = $query->get();
-        $filename = 'legal_acts_' . now()->format('Y_m_d_His') . '.doc';
+        $filename  = 'legal_acts_' . now()->format('Y_m_d_His') . '.doc';
         $exportService = new LegalActWordExportService();
-        $filePath = $exportService->export($legalActs, $filename);
+        $filePath  = $exportService->export($legalActs, $filename);
         return response()->download($filePath, $filename, ['Content-Type' => 'application/msword'])
             ->deleteFileAfterSend(true);
     }
@@ -489,17 +575,57 @@ class LegalActController extends Controller
             abort(403);
         }
 
-        $legalAct->update([
-            'proof_required' => !$legalAct->proof_required,
-        ]);
+        $legalAct->update(['proof_required' => !$legalAct->proof_required]);
 
         return response()->json([
-            'success' => true,
+            'success'       => true,
             'proof_required' => (bool) $legalAct->proof_required,
-            'message' => $legalAct->proof_required
+            'message'       => $legalAct->proof_required
                 ? 'Sübut sənəd məcburi edildi.'
                 : 'Sübut sənəd məcburiliyi ləğv edildi.',
         ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Apply role-based visibility scope to a query.
+     * Admin/manager see all. Others see acts where their dept (or any descendant) is an executor.
+     */
+    private function applyVisibilityScope($query, $user): void
+    {
+        if ($user->canManage()) {
+            return;
+        }
+
+        $query->where(function ($q) use ($user) {
+            if ($user->executor_id) {
+                $q->whereHas('executors', fn($sq) => $sq->where('executors.id', $user->executor_id));
+            }
+            if ($user->department_id) {
+                $deptIds = Department::descendantIdsOf($user->department_id);
+                $q->orWhereHas('executors', fn($sq) => $sq->whereIn('executors.department_id', $deptIds));
+            }
+        });
+    }
+
+    /**
+     * Check whether a non-manager user may view a specific legal act.
+     */
+    private function userCanViewAct(LegalAct $legalAct, $user): bool
+    {
+        if ($user->executor_id && $legalAct->executors()->where('executors.id', $user->executor_id)->exists()) {
+            return true;
+        }
+        if ($user->department_id) {
+            $deptIds = Department::descendantIdsOf($user->department_id);
+            return $legalAct->executors()
+                ->whereIn('executors.department_id', $deptIds)
+                ->exists();
+        }
+        return false;
     }
 
     private function applyFilters(Request $request)
@@ -515,17 +641,7 @@ class LegalActController extends Controller
             'insertedUser',
         ])->active();
 
-        $user = auth()->user();
-        if (!$user->canManage()) {
-            $query->where(function ($q) use ($user) {
-                if ($user->executor_id) {
-                    $q->whereHas('executors', fn($sq) => $sq->where('executors.id', $user->executor_id));
-                }
-                if ($user->department_id) {
-                    $q->orWhereHas('executors', fn($sq) => $sq->where('executors.department_id', $user->department_id));
-                }
-            });
-        }
+        $this->applyVisibilityScope($query, auth()->user());
 
         if ($request->filled('col.legal_act_number')) {
             foreach (preg_split('/\s+/', trim($request->input('col.legal_act_number'))) as $t) {
@@ -561,8 +677,8 @@ class LegalActController extends Controller
             $query->whereHas('executors', fn($q) => $q->where('department_id', $request->input('col.department_id')));
         }
         if ($request->filled('col.deadline_status')) {
-            $status = $request->input('col.deadline_status');
-            $today = now()->startOfDay();
+            $status   = $request->input('col.deadline_status');
+            $today    = now()->startOfDay();
             $notExecuted = fn($q) => $q->whereDoesntHave('statusLogs')
                 ->orWhereDoesntHave('latestStatusLog', fn($sq) => $sq
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_APPROVED)
@@ -595,22 +711,22 @@ class LegalActController extends Controller
     private function validationMessages(): array
     {
         return [
-            'act_type_id.required' => 'Akt növü mütləq seçilməlidir.',
-            'act_type_id.exists' => 'Seçilmiş akt növü mövcud deyil.',
-            'issued_by_id.required' => 'Verən orqan mütləq seçilməlidir.',
-            'issued_by_id.exists' => 'Seçilmiş verən orqan mövcud deyil.',
-            'main_executor_ids.required' => 'Ən azı bir əsas icraçı seçilməlidir.',
-            'main_executor_ids.min' => 'Ən azı bir əsas icraçı seçilməlidir.',
-            'main_executor_ids.*.exists' => 'Seçilmiş əsas icraçı mövcud deyil.',
+            'act_type_id.required'        => 'Akt növü mütləq seçilməlidir.',
+            'act_type_id.exists'          => 'Seçilmiş akt növü mövcud deyil.',
+            'issued_by_id.required'       => 'Verən orqan mütləq seçilməlidir.',
+            'issued_by_id.exists'         => 'Seçilmiş verən orqan mövcud deyil.',
+            'main_executor_ids.required'  => 'Ən azı bir əsas icraçı seçilməlidir.',
+            'main_executor_ids.min'       => 'Ən azı bir əsas icraçı seçilməlidir.',
+            'main_executor_ids.*.exists'  => 'Seçilmiş əsas icraçı mövcud deyil.',
             'helper_executor_ids.*.exists' => 'Seçilmiş digər icraçı mövcud deyil.',
-            'legal_act_number.required' => 'Hüquqi aktın nömrəsi mütləq daxil edilməlidir.',
-            'legal_act_number.max' => 'Hüquqi aktın nömrəsi 255 simvoldan çox ola bilməz.',
-            'legal_act_date.required' => 'Hüquqi aktın tarixi mütləq daxil edilməlidir.',
-            'legal_act_date.date' => 'Hüquqi aktın tarixi düzgün tarix formatında olmalıdır.',
-            'summary.required' => 'Xülasə mütləq daxil edilməlidir.',
-            'execution_deadline.date' => 'İcra müddəti düzgün tarix formatında olmalıdır.',
+            'legal_act_number.required'   => 'Hüquqi aktın nömrəsi mütləq daxil edilməlidir.',
+            'legal_act_number.max'        => 'Hüquqi aktın nömrəsi 255 simvoldan çox ola bilməz.',
+            'legal_act_date.required'     => 'Hüquqi aktın tarixi mütləq daxil edilməlidir.',
+            'legal_act_date.date'         => 'Hüquqi aktın tarixi düzgün tarix formatında olmalıdır.',
+            'summary.required'            => 'Xülasə mütləq daxil edilməlidir.',
+            'execution_deadline.date'     => 'İcra müddəti düzgün tarix formatında olmalıdır.',
             'related_document_number.max' => 'Əlaqəli sənədin nömrəsi 255 simvoldan çox ola bilməz.',
-            'related_document_date.date' => 'Əlaqəli sənədin tarixi düzgün tarix formatında olmalıdır.',
+            'related_document_date.date'  => 'Əlaqəli sənədin tarixi düzgün tarix formatında olmalıdır.',
         ];
     }
 }

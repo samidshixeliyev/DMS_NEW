@@ -84,6 +84,15 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user can create and assign tasks.
+     * True for admin/manager and for users whose department has can_assign=true.
+     */
+    public function canAssignTasks(): bool
+    {
+        return $this->canManage() || (bool) $this->department?->can_assign;
+    }
+
+    /**
      * Check if user is admin.
      */
     public function isAdmin(): bool

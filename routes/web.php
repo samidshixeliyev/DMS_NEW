@@ -28,7 +28,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('change-password', [UserController::class, 'changePassword'])->name('change-password');
 
-    Route::middleware('role:executor,admin,manager')->group(function () {
+    Route::middleware('role:executor,admin,manager,user')->group(function () {
         Route::get('executor/dashboard', [ExecutorDashboardController::class, 'index'])->name('executor.index');
         Route::post('executor/dashboard/load', [ExecutorDashboardController::class, 'load'])->name('executor.load');
         Route::get('executor/legal-acts/{legalAct}', [ExecutorDashboardController::class, 'show'])->name('executor.show');

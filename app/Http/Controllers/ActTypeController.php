@@ -69,6 +69,7 @@ class ActTypeController extends Controller
 
     public function show(ActType $actType)
     {
+        
         return response()->json([
             'id' => $actType->id,
             'name' => $actType->name,

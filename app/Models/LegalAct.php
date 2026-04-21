@@ -55,7 +55,7 @@ class LegalAct extends Model
     public function executors()
     {
         return $this->belongsToMany(Executor::class, 'legal_act_executor')
-                    ->withPivot('role')
+                    ->withPivot('role', 'task_description')
                     ->withTimestamps();
     }
 

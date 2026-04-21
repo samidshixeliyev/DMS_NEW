@@ -14,13 +14,13 @@ class DepartmentController extends Controller
 
     public function load(Request $request)
     {
-        $draw = $request->input('draw', 1);
-        $start = $request->input('start', 0);
+        $draw   = $request->input('draw', 1);
+        $start  = $request->input('start', 0);
         $length = $request->input('length', 25);
 
         $totalRecords = Department::active()->count();
 
-        $query = Department::active();
+        $query = Department::active()->with('parent');
 
         $search = $request->input('search.value');
         if ($search) {
@@ -42,54 +42,98 @@ class DepartmentController extends Controller
         $data = [];
         foreach ($results as $i => $dept) {
             $data[] = [
-                'id' => $dept->id,
-                'rowNum' => $start + $i + 1,
-                'name' => $dept->name,
+                'id'         => $dept->id,
+                'rowNum'     => $start + $i + 1,
+                'name'       => $dept->name,
+                'parent'     => $dept->parent?->name ?? '-',
+                'can_assign' => $dept->can_assign
+                    ? '<span class="badge bg-success">Bəli</span>'
+                    : '<span class="badge bg-secondary">Xeyr</span>',
             ];
         }
 
         return response()->json([
-            'draw' => (int) $draw,
-            'recordsTotal' => $totalRecords,
+            'draw'            => (int) $draw,
+            'recordsTotal'    => $totalRecords,
             'recordsFiltered' => $filteredRecords,
-            'data' => $data,
+            'data'            => $data,
         ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate(['name' => 'required|string|max:255']);
+        $validated = $request->validate([
+            'name'      => 'required|string|max:255',
+            'parent_id' => 'nullable|exists:departments,id',
+            'can_assign' => 'nullable|boolean',
+        ]);
+
+        $validated['can_assign'] = $request->boolean('can_assign');
+
         Department::create($validated);
-        return redirect()->route('departments.index')->with('success', 'Department created successfully.');
+
+        return redirect()->route('departments.index')->with('success', 'İdarə uğurla yaradıldı.');
     }
 
     public function show(Department $department)
     {
+        $department->load('parent');
+
         return response()->json([
-            'id' => $department->id,
-            'name' => $department->name,
-            'created_at' => $department->created_at?->format('d.m.Y H:i'),
+            'id'          => $department->id,
+            'name'        => $department->name,
+            'parent_id'   => $department->parent_id,
+            'parent_name' => $department->parent?->name,
+            'can_assign'  => (bool) $department->can_assign,
+            'created_at'  => $department->created_at?->format('d.m.Y H:i'),
         ]);
     }
 
     public function edit(Department $department)
     {
+        $allDepts = Department::active()
+            ->where('id', '!=', $department->id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return response()->json([
-            'id' => $department->id,
-            'name' => $department->name,
+            'id'             => $department->id,
+            'name'           => $department->name,
+            'parent_id'      => $department->parent_id,
+            'can_assign'     => (bool) $department->can_assign,
+            'all_departments' => $allDepts,
         ]);
     }
 
     public function update(Request $request, Department $department)
     {
-        $validated = $request->validate(['name' => 'required|string|max:255']);
+        $validated = $request->validate([
+            'name'      => 'required|string|max:255',
+            'parent_id' => [
+                'nullable',
+                'exists:departments,id',
+                function ($attribute, $value, $fail) use ($department) {
+                    if ($value === null) return;
+                    $descendants = Department::descendantIdsOf($department->id);
+                    if (in_array((int) $value, $descendants)) {
+                        $fail('Bir idarə öz alt-idarəsinə tabe ola bilməz (dövri əlaqə).');
+                    }
+                },
+            ],
+            'can_assign' => 'nullable|boolean',
+        ]);
+
+        $validated['can_assign'] = $request->boolean('can_assign');
+
         $department->update($validated);
-        return redirect()->route('departments.index')->with('success', 'Department updated successfully.');
+
+        return redirect()->route('departments.index')->with('success', 'İdarə uğurla yeniləndi.');
     }
 
     public function destroy(Department $department)
     {
         $department->update(['is_deleted' => true]);
-        return redirect()->route('departments.index')->with('success', 'Department deleted successfully.');
+
+        return redirect()->route('departments.index')->with('success', 'İdarə uğurla silindi.');
     }
 }

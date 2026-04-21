@@ -867,6 +867,7 @@
         const userRole = @json(auth()->user()?->user_role ?? 'user');
         const canManage = ['admin', 'manager'].includes(userRole);
         const isAdmin = userRole === 'admin';
+        const canAssign = canManage || @json(auth()->user()?->canAssignTasks() ?? false);
 
         function escapeHtml(text) {
             if (!text) return '';

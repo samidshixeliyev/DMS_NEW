@@ -255,7 +255,7 @@
 @section('content')
     <div class="page-header">
         <h2><i class="bi bi-file-text me-2"></i>Hüquqi Aktlar</h2>
-        @if($canManage)
+        @if($canManage || $canAssign)
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
                 <i class="bi bi-plus-circle me-1"></i> Yeni əlavə et
             </button>
@@ -444,6 +444,8 @@
                                 </select>
                             </div>
 
+
+
                             <div class="col-md-6">
                                 <label class="form-label">İcra müddəti</label>
                                 <input type="text" name="execution_deadline" class="form-control modal-datepicker"
@@ -462,6 +464,14 @@
                                 <label class="form-label">Tapşırıq</label>
                                 <textarea name="task_description" class="form-control"
                                     rows="2">{{ old('task_description') }}</textarea>
+                            </div>
+                            {{-- PER-EXECUTOR TASK DESCRIPTIONS --}}
+                            <div class="col-12" id="create_executor_tasks_section" style="display:none">
+                                <label class="form-label fw-semibold">
+                                    <i class="bi bi-list-task me-1"></i>İcraçı üzrə fərdi tapşırıqlar
+                                    <small class="text-muted fw-normal ms-1">boş saxlanılarsa ümumi tapşırıq tətbiq olunur</small>
+                                </label>
+                                <div id="create_executor_task_fields"></div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Əlaqəli sənəd №</label>
@@ -585,8 +595,8 @@
             ['#filter_act_type', '#filter_issued_by', '#filter_executor', '#filter_deadline_status', '#filter_department'].forEach(function (s) {
                 $(s).select2({ theme: 'bootstrap-5', dropdownParent: $p, placeholder: $(s).find('option:first').text(), allowClear: true, width: '100%' });
             });
-            var fpCfg = { mode: 'range', dateFormat: 'd.m.Y', locale: flatpickr.l10ns.az, allowInput: false };
-            fpCfg.locale.rangeSeparator = ' — ';
+            var azLocale = Object.assign({}, flatpickr.l10ns.az || {}, { rangeSeparator: ' — ' });
+            var fpCfg = { mode: 'range', dateFormat: 'd.m.Y', locale: azLocale, allowInput: false };
             var fpDate = flatpickr('#filter_date_range', Object.assign({}, fpCfg));
             var fpDead = flatpickr('#filter_deadline_range', Object.assign({}, fpCfg));
 
@@ -684,6 +694,52 @@
 
             guardExecutorOverlap($cm);
             syncExecutorSelects($cm);
+
+            // Per-executor task_description fields — create modal
+            var executorMeta = {};
+            @foreach($executors as $e)
+            executorMeta[{{ $e->id }}] = { name: @json($e->name), dept: @json($e->department?->name ?? '') };
+            @endforeach
+
+            function renderExecutorTaskFields($modal, metaMap) {
+                var $section = $modal.find('#create_executor_tasks_section, #edit_executor_tasks_section');
+                var $fields  = $modal.find('#create_executor_task_fields, #edit_executor_task_fields');
+                var $main   = $modal.find('select[name="main_executor_ids[]"]');
+                var $helper = $modal.find('select[name="helper_executor_ids[]"]');
+                var allSelected = [].concat($main.val() || [], $helper.val() || []).map(Number).filter(Boolean);
+
+                if (allSelected.length === 0) {
+                    $section.hide();
+                    return;
+                }
+                $section.show();
+
+                var existing = {};
+                $fields.find('textarea').each(function() {
+                    var m = this.name.match(/executor_tasks\[(\d+)\]/);
+                    if (m) existing[m[1]] = this.value;
+                });
+
+                var html = '';
+                allSelected.forEach(function(id) {
+                    var meta  = metaMap[id] || { name: 'İcraçı #' + id, dept: '' };
+                    var label = meta.name + (meta.dept ? ' (' + meta.dept + ')' : '');
+                    var val   = escapeHtml(existing[id] || '');
+                    html += '<div class="mb-2">'
+                          + '<label class="form-label mb-1 text-muted" style="font-size:0.82rem"><i class="bi bi-person me-1"></i>' + escapeHtml(label) + '</label>'
+                          + '<textarea name="executor_tasks[' + id + ']" class="form-control form-control-sm" rows="2" placeholder="Bu icraçı üçün fərdi tapşırıq (boş = ümumi tapşırıq)">' + val + '</textarea>'
+                          + '</div>';
+                });
+                $fields.html(html);
+            }
+
+            $cm.find('select[name="main_executor_ids[]"], select[name="helper_executor_ids[]"]').on('change', function () {
+                renderExecutorTaskFields($cm, executorMeta);
+            });
+
+            @if($errors->any() && old('act_type_id'))
+            new bootstrap.Modal(document.getElementById('createModal')).show();
+            @endif
         });
 
         async function showDetails(id) {
@@ -749,6 +805,13 @@
 
                     h += '<div class="mb-1"><strong style="font-size:0.85rem">' + escapeHtml(ex.name) + '</strong> ' + roleBadge + '</div>';
 
+                    // Per-executor private task description (only shown if it differs from global)
+                    if (ex.task_description) {
+                        h += '<div class="mb-1 p-2 rounded" style="background:#f0f9ff;font-size:0.8rem;white-space:pre-wrap;border-left:3px solid #0284c7">'
+                           + '<i class="bi bi-list-task me-1 text-info"></i>'
+                           + escapeHtml(ex.task_description) + '</div>';
+                    }
+
                     if (userLogs.length === 0) {
                         h += '<p class="text-muted fst-italic" style="font-size:0.78rem;margin-left:1rem">Status yoxdur</p>';
                     } else {
@@ -796,7 +859,7 @@
                 + '<tr><th>Kim qəbul edib</th><td>' + escapeHtml(data.issuing_authority || '-') + '</td></tr>'
                 + '<tr><th>Qısa məzmun</th><td style="white-space:pre-wrap">' + escapeHtml(data.summary || '-') + '</td></tr>'
                 + '<tr><th>Tapşırıq №</th><td>' + escapeHtml(data.task_number || '-') + '</td></tr>'
-                + '<tr><th>Tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_description || '-') + '</td></tr>'
+                + '<tr><th>Ümumi tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_description || '-') + '</td></tr>'
                 + '<tr><th>İcra müddəti</th><td>' + escapeHtml(data.execution_deadline || '-') + '</td></tr>'
                 + '<tr><th>Əlaqəli sənəd</th><td>' + escapeHtml(data.related_document_number || '-') + '</td></tr>'
                 + '<tr><th>Daxil edən</th><td>' + escapeHtml(data.inserted_user || '-') + '</td></tr>'
@@ -843,6 +906,27 @@
             if (data.executors) h += buildOpts(data.executors, data.helper_executor_ids || []);
             h += '</select></div>';
 
+            // Per-executor task_description section
+            h += '<div class="col-12" id="edit_executor_tasks_section">';
+            h += '<label class="form-label fw-semibold"><i class="bi bi-list-task me-1"></i>İcraçı üzrə fərdi tapşırıqlar <small class="text-muted fw-normal">boş saxlanılarsa ümumi tapşırıq tətbiq olunur</small></label>';
+            h += '<div id="edit_executor_task_fields">';
+            // Render immediately for currently-selected executors
+            var allSelectedIds = (data.main_executor_ids || []).concat(data.helper_executor_ids || []);
+            if (data.executors && allSelectedIds.length > 0) {
+                var execMap = {};
+                data.executors.forEach(function(e) { execMap[e.id] = e; });
+                allSelectedIds.forEach(function(eid) {
+                    var ex = execMap[eid];
+                    if (!ex) return;
+                    var dept  = ex.department ? ' (' + escapeHtml(ex.department.name) + ')' : '';
+                    var label = escapeHtml(ex.name) + dept;
+                    var val   = escapeHtml((data.executor_tasks || {})[eid] || '');
+                    h += '<div class="mb-2"><label class="form-label mb-1 text-muted" style="font-size:0.82rem"><i class="bi bi-person me-1"></i>' + label + '</label>';
+                    h += '<textarea name="executor_tasks[' + eid + ']" class="form-control form-control-sm" rows="2" placeholder="Bu icraçı üçün fərdi tapşırıq (boş = ümumi tapşırıq)">' + val + '</textarea></div>';
+                });
+            }
+            h += '</div></div>';
+
             h += '<div class="col-md-6"><label class="form-label">İcra müddəti</label><input type="text" name="execution_deadline" class="form-control edit-datepicker" value="' + escapeHtml(data.execution_deadline || '') + '"></div>';
             h += '<div class="col-md-6"><label class="form-label">Tapşırıq №</label><input type="text" name="task_number" class="form-control" value="' + escapeHtml(data.task_number || '') + '"></div>';
             h += '<div class="col-12"><label class="form-label">Qısa məzmun *</label><textarea name="summary" class="form-control" rows="3" required>' + escapeHtml(data.summary || '') + '</textarea></div>';
@@ -865,11 +949,46 @@
                 $(this).select2({ theme: 'bootstrap-5', dropdownParent: $m.find('.modal-body'), placeholder: 'Seçin...', allowClear: true, width: '100%' });
             });
             $m.find('.edit-datepicker').each(function () {
-                flatpickr(this, { dateFormat: 'Y-m-d', locale: flatpickr.l10ns.az, allowInput: true });
+                flatpickr(this, { dateFormat: 'd.m.Y', locale: flatpickr.l10ns.az, allowInput: true });
             });
 
             syncExecutorSelects($m);
             guardExecutorOverlap($m);
+
+            // Build executor meta map for dynamic task fields
+            var editExecMeta = {};
+            (data.executors || []).forEach(function(e) {
+                editExecMeta[e.id] = { name: e.name, dept: e.department ? e.department.name : '' };
+            });
+            var editExecTasks = data.executor_tasks || {};
+
+            function renderEditTaskFields() {
+                var $main   = $m.find('select[name="main_executor_ids[]"]');
+                var $helper = $m.find('select[name="helper_executor_ids[]"]');
+                var allIds  = [].concat($main.val() || [], $helper.val() || []).map(Number).filter(Boolean);
+                var $fields = $('#edit_executor_task_fields');
+
+                var existing = {};
+                $fields.find('textarea').each(function() {
+                    var match = this.name.match(/executor_tasks\[(\d+)\]/);
+                    if (match) existing[match[1]] = this.value;
+                });
+
+                var html = '';
+                allIds.forEach(function(id) {
+                    var meta  = editExecMeta[id] || { name: 'İcraçı #' + id, dept: '' };
+                    var dept  = meta.dept ? ' (' + escapeHtml(meta.dept) + ')' : '';
+                    var label = escapeHtml(meta.name) + dept;
+                    var val   = escapeHtml(existing[id] !== undefined ? existing[id] : (editExecTasks[id] || ''));
+                    html += '<div class="mb-2"><label class="form-label mb-1 text-muted" style="font-size:0.82rem"><i class="bi bi-person me-1"></i>' + label + '</label>'
+                          + '<textarea name="executor_tasks[' + id + ']" class="form-control form-control-sm" rows="2" placeholder="Bu icraçı üçün fərdi tapşırıq (boş = ümumi tapşırıq)">' + val + '</textarea></div>';
+                });
+                $fields.html(html);
+                $('#edit_executor_tasks_section').toggle(allIds.length > 0);
+            }
+
+            $m.find('select[name="main_executor_ids[]"], select[name="helper_executor_ids[]"]').on('change', renderEditTaskFields);
+
             new bootstrap.Modal(document.getElementById('editModal')).show();
         }
 

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Issuing Authorities')
+@section('title', 'Kim qəbul edib')
 
 @section('content')
 <div class="page-header">
@@ -26,8 +26,8 @@
                 <thead>
                     <tr>
                         <th style="width: 70px">ID</th>
-                        <th>Name</th>
-                        <th style="width: 150px">Actions</th>
+                        <th>Ad</th>
+                        <th style="width: 150px">Əməliyyat</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,7 +61,7 @@
                             <td colspan="3">
                                 <div class="empty-state">
                                     <i class="bi bi-building-check d-block"></i>
-                                    <p class="mb-0">No issuing authorities found</p>
+                                    <p class="mb-0">Məlumat tapılmadı</p>
                                 </div>
                             </td>
                         </tr>
@@ -84,18 +84,18 @@
             <form action="{{ route('issuing-authorities.store') }}" method="POST">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Create Issuing Authority</h5>
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Yeni əlavə et</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <label class="form-label">Ad <span class="text-danger">*</span></label>
                         <input type="text" name="name" class="form-control" required autofocus>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Create</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Ləğv et</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Yarat</button>
                 </div>
             </form>
         </div>
@@ -110,18 +110,18 @@
                 @csrf
                 @method('PUT')
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Issuing Authority</h5>
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Redaktə et</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <label class="form-label">Ad <span class="text-danger">*</span></label>
                         <input type="text" name="name" id="edit_name" class="form-control" required>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Update</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Ləğv et</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Yenilə</button>
                 </div>
             </form>
         </div>
@@ -133,12 +133,12 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>Authority Details</h5>
+                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>Orqan məlumatları</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="showModalBody"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bağla</button>
             </div>
         </div>
     </div>
@@ -159,8 +159,8 @@ async function showDetails(id) {
     document.getElementById('showModalBody').innerHTML = `
         <table class="table table-bordered detail-table mb-0">
             <tr><th width="35%">ID</th><td>${escapeHtml(String(data.id))}</td></tr>
-            <tr><th>Name</th><td>${escapeHtml(data.name)}</td></tr>
-            <tr><th>Created At</th><td>${escapeHtml(data.created_at || '-')}</td></tr>
+            <tr><th>Ad</th><td>${escapeHtml(data.name)}</td></tr>
+            <tr><th>Yaradılıb</th><td>${escapeHtml(data.created_at || '-')}</td></tr>
         </table>
     `;
     new bootstrap.Modal(document.getElementById('showModal')).show();
@@ -176,7 +176,7 @@ async function editRecord(id) {
 }
 
 function deleteRecord(id) {
-    if (confirm('Are you sure you want to delete this issuing authority?')) {
+    if (confirm('Bu orqanı silmək istədiyinizdən əminsiniz?')) {
         const form = document.getElementById('deleteForm');
         form.action = `/issuing-authorities/${id}`;
         form.submit();
