@@ -750,7 +750,7 @@
                 (list || []).forEach(function (e) {
                     var dept = e.department || 'Təyin olunmayıb';
                     if (!deptMap[dept]) deptMap[dept] = { executors: [], key: 'showDept' + Object.keys(deptMap).length };
-                    deptMap[dept].executors.push({ id: e.id, name: e.name, position: e.position, role: role });
+                    deptMap[dept].executors.push({ id: e.id, name: e.name, position: e.position, role: role, task_description: e.task_description });
                 });
             }
             groupByDept(data.main_executors, 'Əsas');
