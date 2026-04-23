@@ -93,6 +93,29 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user may create legal acts.
+     * True for admin/manager, or for users whose department (or any ancestor) has can_assign=true.
+     */
+    public function canCreateLegalActs(): bool
+    {
+        return $this->canManage() || $this->canAssignDeptId() !== null;
+    }
+
+    /**
+     * Returns the ID of the nearest ancestor department (or own) that has can_assign=true.
+     * This defines the root of the subtree the user is allowed to assign tasks within.
+     */
+    public function canAssignDeptId(): ?int
+    {
+        $dept = $this->department;
+        while ($dept) {
+            if ($dept->can_assign) return $dept->id;
+            $dept = $dept->parent;
+        }
+        return null;
+    }
+
+    /**
      * Check if user is admin.
      */
     public function isAdmin(): bool

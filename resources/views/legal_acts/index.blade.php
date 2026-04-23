@@ -345,7 +345,7 @@
                 <table class="table table-hover table-bordered mb-0" id="legalActsTable" style="width:100%">
                     <thead>
                         <tr class="band-header">
-                            <th colspan="5" class="bg-band-doc">Sənəd Məlumatları</th>
+                            <th colspan="6" class="bg-band-doc">Sənəd Məlumatları</th>
                             <th colspan="2" class="bg-band-task">Tapşırıq</th>
                             <th colspan="4" class="bg-band-exec">İcraçı Məlumatları</th>
                             <th rowspan="2" class="bg-band-actions" style="position:sticky;right:0;z-index:4;"></th>
@@ -355,6 +355,7 @@
                             <th class="bg-band-doc-sub">Nömrəsi</th>
                             <th class="bg-band-doc-sub">Tarixi</th>
                             <th class="bg-band-doc-sub">Kim Qəbul Edib</th>
+                            <th class="bg-band-doc-sub">Sənədin sahibi</th>
                             <th class="bg-band-doc-sub">Qısa Məzmun</th>
                             <th class="bg-band-task-sub">Tapşırıq №</th>
                             <th class="bg-band-task-sub">Tapşırıq</th>
@@ -636,6 +637,7 @@
                     { data: 'legalActNumber', className: 'fw-semibold text-center' },
                     { data: 'legalActDate', className: 'text-center', width: '85px' },
                     { data: 'issuingAuthority' },
+                    { data: 'insertedUser', className: 'text-center' },
                     { data: 'summary', className: 'wrap-cell' },
                     { data: 'taskNumber', className: 'text-center' },
                     { data: 'taskDescription', className: 'wrap-cell' },

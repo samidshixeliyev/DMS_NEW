@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Department;
 
 class LegalAct extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'act_type_id',
         'issued_by_id',
         'legal_act_number',
@@ -40,6 +42,11 @@ class LegalAct extends Model
     public function scopeActive($query)
     {
         return $query->where('is_deleted', false);
+    }
+
+    public function organization()
+    {
+        return $this->belongsTo(Department::class, 'organization_id');
     }
 
     public function actType()

@@ -33,20 +33,23 @@ class LegalActController extends Controller
         // Executors available for assignment — restricted by hierarchy for dept users
         if ($canManage) {
             $executors = Executor::with('department')->active()->get();
-        } elseif ($canAssign && $user->department_id) {
-            $deptIds   = Department::descendantIdsOf($user->department_id);
+        } elseif ($canAssign && ($assignDeptId = $user->canAssignDeptId())) {
+            $deptIds   = Department::descendantIdsOf($assignDeptId);
             $executors = Executor::with('department')->active()->whereIn('department_id', $deptIds)->get();
         } else {
             $executors = collect();
         }
 
         $pendingApprovalCount = 0;
-        if ($canManage) {
+        if ($canManage && $user->department?->can_assign) {
             $icraIds = \App\Models\ExecutionNote::all()
                 ->filter(fn($n) => mb_stripos($n->note, 'İcra olunub') !== false)
                 ->pluck('id')->toArray();
             $pendingApprovalCount = count($icraIds) > 0
-                ? ExecutorStatusLog::pending()->whereIn('execution_note_id', $icraIds)->count()
+                ? ExecutorStatusLog::pending()
+                    ->whereIn('execution_note_id', $icraIds)
+                    ->whereHas('legalAct', fn($q) => $q->where('organization_id', $user->department_id)->where('is_deleted', false))
+                    ->count()
                 : 0;
         }
 
@@ -83,10 +86,11 @@ class LegalActController extends Controller
             0 => $query->orderBy('created_at', $orderDir),
             1 => $query->orderBy('legal_act_number', $orderDir),
             2 => $query->orderBy('legal_act_date', $orderDir),
-            5 => $query->orderBy('task_number', $orderDir),
-            9 => $query->orderBy('execution_deadline', $orderDir),
-            11 => $query->orderBy('related_document_number', $orderDir),
-            12 => $query->orderBy('related_document_date', $orderDir),
+            4 => $query->orderBy('inserted_user_id', $orderDir),
+            6 => $query->orderBy('task_number', $orderDir),
+            10 => $query->orderBy('execution_deadline', $orderDir),
+            12 => $query->orderBy('related_document_number', $orderDir),
+            13 => $query->orderBy('related_document_date', $orderDir),
             default => $query->orderBy('id', 'desc'),
         };
 
@@ -231,7 +235,9 @@ class LegalActController extends Controller
                 'noteHtml'         => $noteHtml,
                 'relatedDocNumber' => $act->related_document_number ?? '-',
                 'relatedDocDate'   => $act->related_document_date?->format('d.m.Y') ?? '-',
-                'insertedUser'     => $act->insertedUser ? $act->insertedUser->name . ' ' . $act->insertedUser->surname : '-',
+                'insertedUser'     => $act->insertedUser?->executor
+                    ? e($act->insertedUser->executor->name) . ($act->insertedUser->executor->position ? '<br><small class="text-muted">' . e($act->insertedUser->executor->position) . '</small>' : '')
+                    : '-',
                 'canEdit'          => ($userId === $act->inserted_user_id) || $canManage,
                 'canDelete'        => $isAdmin,
                 'hasPendingApproval' => $anyPending,
@@ -252,8 +258,8 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->canAssignTasks()) {
-            abort(403, 'Tapşırıq yaratmaq icazəniz yoxdur.');
+        if (!$user->canCreateLegalActs()) {
+            abort(403, 'Hüquqi akt yaratmaq icazəniz yoxdur.');
         }
 
         $validated = $request->validate([
@@ -277,7 +283,8 @@ class LegalActController extends Controller
         ], $this->validationMessages());
 
         $year   = Carbon::parse($validated['legal_act_date'])->year;
-        $exists = LegalAct::where('act_type_id', $validated['act_type_id'])
+        $exists = LegalAct::where('organization_id', $user->department_id)
+            ->where('act_type_id', $validated['act_type_id'])
             ->where('legal_act_number', $validated['legal_act_number'])
             ->whereYear('legal_act_date', $year)
             ->where('is_deleted', false)
@@ -294,9 +301,8 @@ class LegalActController extends Controller
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
-        // Dept-level users can only assign to their own subtree
-        if (!$user->canManage() && $user->department_id) {
-            $allowedDeptIds = Department::descendantIdsOf($user->department_id);
+        if (!$user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
+            $allowedDeptIds = Department::descendantIdsOf($assignDeptId);
             $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
                 ->whereNotIn('department_id', $allowedDeptIds)
                 ->exists();
@@ -308,6 +314,7 @@ class LegalActController extends Controller
         $executorTasks = $validated['executor_tasks'] ?? [];
         $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids', 'executor_tasks'])->toArray();
         $actData['inserted_user_id'] = auth()->id();
+        $actData['organization_id']  = $user->department_id;
         $actData['proof_required']   = $request->boolean('proof_required') ? 1 : 0;
 
         $legalAct = LegalAct::create($actData);
@@ -332,7 +339,11 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->canManage() && !$this->userCanViewAct($legalAct, $user)) {
+        if ($user->canManage()) {
+            if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id) {
+                abort(403);
+            }
+        } elseif (!$this->userCanViewAct($legalAct, $user)) {
             abort(403);
         }
 
@@ -414,7 +425,11 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->canManage() && auth()->id() !== $legalAct->inserted_user_id) {
+        if ($user->canManage()) {
+            if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id) {
+                abort(403);
+            }
+        } elseif (auth()->id() !== $legalAct->inserted_user_id) {
             abort(403);
         }
 
@@ -423,8 +438,8 @@ class LegalActController extends Controller
         // Build executor list filtered by what this user may assign
         if ($user->canManage()) {
             $executors = Executor::with('department')->active()->get();
-        } elseif ($user->department_id) {
-            $deptIds   = Department::descendantIdsOf($user->department_id);
+        } elseif ($assignDeptId = $user->canAssignDeptId()) {
+            $deptIds   = Department::descendantIdsOf($assignDeptId);
             $executors = Executor::with('department')->active()->whereIn('department_id', $deptIds)->get();
         } else {
             $executors = collect();
@@ -491,7 +506,8 @@ class LegalActController extends Controller
         ], $this->validationMessages());
 
         $year   = Carbon::parse($validated['legal_act_date'])->year;
-        $exists = LegalAct::where('act_type_id', $validated['act_type_id'])
+        $exists = LegalAct::where('organization_id', $legalAct->organization_id)
+            ->where('act_type_id', $validated['act_type_id'])
             ->where('legal_act_number', $validated['legal_act_number'])
             ->whereYear('legal_act_date', $year)
             ->where('is_deleted', false)
@@ -509,9 +525,8 @@ class LegalActController extends Controller
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
-        // Dept-level users can only assign to their own subtree
-        if (!$user->canManage() && $user->department_id) {
-            $allowedDeptIds = Department::descendantIdsOf($user->department_id);
+        if (!$user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
+            $allowedDeptIds = Department::descendantIdsOf($assignDeptId);
             $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
                 ->whereNotIn('department_id', $allowedDeptIds)
                 ->exists();
@@ -545,8 +560,11 @@ class LegalActController extends Controller
 
     public function destroy(LegalAct $legalAct)
     {
-        if (!auth()->user()->isAdmin())
+        $user = auth()->user();
+        if (!$user->isAdmin())
             abort(403, 'Yalnız admin silə bilər.');
+        if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id)
+            abort(403, 'Bu hüquqi akt sizin idarənizə aid deyil.');
         $legalAct->update(['is_deleted' => true]);
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla silindi.');
     }
@@ -571,9 +589,11 @@ class LegalActController extends Controller
 
     public function toggleProofRequired(LegalAct $legalAct)
     {
-        if (!auth()->user()->canManage()) {
+        $user = auth()->user();
+        if (!$user->canManage())
             abort(403);
-        }
+        if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id)
+            abort(403);
 
         $legalAct->update(['proof_required' => !$legalAct->proof_required]);
 
@@ -597,6 +617,14 @@ class LegalActController extends Controller
     private function applyVisibilityScope($query, $user): void
     {
         if ($user->canManage()) {
+            if ($user->department?->can_assign) {
+                $query->where('organization_id', $user->department_id);
+            } else {
+                if ($user->department_id) {
+                    $deptIds = Department::descendantIdsOf($user->department_id);
+                    $query->whereHas('executors', fn($sq) => $sq->whereIn('executors.department_id', $deptIds));
+                }
+            }
             return;
         }
 
@@ -638,7 +666,7 @@ class LegalActController extends Controller
             'latestStatusLog.approvedByUser',
             'statusLogs' => fn($q) => $q->with('executionNote', 'user')->reorder('created_at', 'asc'),
             'executors.users',
-            'insertedUser',
+            'insertedUser.executor',
         ])->active();
 
         $this->applyVisibilityScope($query, auth()->user());
