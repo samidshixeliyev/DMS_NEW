@@ -182,9 +182,14 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Şöbə</label>
-                                <select name="department_id" class="form-select">
-                                    <option value="">Seç (ixtiyari)</option>
+                                <label class="form-label">
+                                    Şöbə
+                                    <span class="text-danger dept-required-create" style="display:{{ old('user_role') === 'manager' ? 'inline' : 'none' }};"> *</span>
+                                    <small class="text-muted dept-hint-create" style="display:{{ old('user_role') === 'manager' ? 'none' : 'inline' }};">(ixtiyari)</small>
+                                </label>
+                                <select name="department_id" id="create_department_id" class="form-select"
+                                    {{ old('user_role') === 'manager' ? 'required' : '' }}>
+                                    <option value="">Seç</option>
                                     @foreach(\App\Models\Department::active()->get() as $dept)
                                         <option value="{{ $dept->id }}" {{ old('department_id') == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
                                     @endforeach
@@ -252,9 +257,13 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Şöbə</label>
+                                <label class="form-label">
+                                    Şöbə
+                                    <span class="text-danger dept-required-edit" style="display:none;"> *</span>
+                                    <small class="text-muted dept-hint-edit">(ixtiyari)</small>
+                                </label>
                                 <select name="department_id" id="edit_department_id" class="form-select">
-                                    <option value="">Seç (ixtiyari)</option>
+                                    <option value="">Seç</option>
                                 </select>
                             </div>
                         </div>
@@ -295,6 +304,9 @@
         const roleLabels = { admin: 'Admin', manager: 'Menecer', user: 'İstifadəçi', executor: 'İcraçı' };
 
         document.addEventListener('DOMContentLoaded', function () {
+            // Sync role-dependent field state with any pre-filled old() values
+            toggleExecutorFields('create');
+
             var $cm = $('#createModal');
             $cm.find('select').each(function () {
                 $(this).select2({ theme: 'bootstrap-5', dropdownParent: $cm.find('.modal-body'), placeholder: 'Seç', allowClear: true, width: '100%' });
@@ -327,10 +339,23 @@
 
         function toggleExecutorFields(prefix) {
             var role = document.getElementById(prefix + '_user_role').value;
+
+            // Show executor-specific fields only for executor role
             var fields = document.querySelectorAll('.executor-fields-' + prefix);
             fields.forEach(function (el) {
                 el.style.display = (role === 'executor') ? 'block' : 'none';
             });
+
+            // Department field is required for manager role
+            var isManager = (role === 'manager');
+            var deptSelect = document.getElementById(prefix + '_department_id');
+            if (deptSelect) deptSelect.required = isManager;
+
+            var requiredMark = document.querySelector('.dept-required-' + prefix);
+            if (requiredMark) requiredMark.style.display = isManager ? 'inline' : 'none';
+
+            var hint = document.querySelector('.dept-hint-' + prefix);
+            if (hint) hint.style.display = isManager ? 'none' : 'inline';
         }
 
         async function showDetails(id) {

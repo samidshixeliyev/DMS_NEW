@@ -26,7 +26,9 @@ class UserController extends Controller
             'password' => 'required|string|min:6|confirmed',
             'user_role' => 'required|in:admin,manager,user,executor',
             'executor_id' => 'nullable|exists:executors,id',
-            'department_id' => 'nullable|exists:departments,id',
+            'department_id' => $request->input('user_role') === 'manager'
+                ? 'required|exists:departments,id'
+                : 'nullable|exists:departments,id',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -77,7 +79,9 @@ class UserController extends Controller
             'password' => 'nullable|string|min:6|confirmed',
             'user_role' => 'required|in:admin,manager,user,executor',
             'executor_id' => 'nullable|exists:executors,id',
-            'department_id' => 'nullable|exists:departments,id',
+            'department_id' => $request->input('user_role') === 'manager'
+                ? 'required|exists:departments,id'
+                : 'nullable|exists:departments,id',
         ]);
 
         if (!empty($validated['password'])) {

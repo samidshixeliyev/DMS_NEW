@@ -30,8 +30,8 @@ class LegalActController extends Controller
         $executionNotes      = ExecutionNote::active()->get();
         $departments         = Department::active()->get();
 
-        // Executors available for assignment — restricted by hierarchy for dept users
-        if ($canManage) {
+        // Executors available for assignment — admin sees all; everyone else scoped to their dept tree
+        if ($user->isAdmin()) {
             $executors = Executor::with('department')->active()->get();
         } elseif ($canAssign && ($assignDeptId = $user->canAssignDeptId())) {
             $deptIds   = Department::descendantIdsOf($assignDeptId);
@@ -301,7 +301,7 @@ class LegalActController extends Controller
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
-        if (!$user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
+        if (!$user->isAdmin() && ($assignDeptId = $user->canAssignDeptId())) {
             $allowedDeptIds = Department::descendantIdsOf($assignDeptId);
             $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
                 ->whereNotIn('department_id', $allowedDeptIds)
@@ -435,8 +435,8 @@ class LegalActController extends Controller
 
         $legalAct->load('executors.department');
 
-        // Build executor list filtered by what this user may assign
-        if ($user->canManage()) {
+        // Build executor list filtered by what this user may assign — admin sees all; others scoped to dept tree
+        if ($user->isAdmin()) {
             $executors = Executor::with('department')->active()->get();
         } elseif ($assignDeptId = $user->canAssignDeptId()) {
             $deptIds   = Department::descendantIdsOf($assignDeptId);
@@ -525,7 +525,7 @@ class LegalActController extends Controller
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
-        if (!$user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
+        if (!$user->isAdmin() && ($assignDeptId = $user->canAssignDeptId())) {
             $allowedDeptIds = Department::descendantIdsOf($assignDeptId);
             $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
                 ->whereNotIn('department_id', $allowedDeptIds)
