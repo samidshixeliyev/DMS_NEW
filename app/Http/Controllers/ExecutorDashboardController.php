@@ -12,16 +12,14 @@ use Illuminate\Support\Str;
 
 class ExecutorDashboardController extends Controller
 {
-    private static ?array $icraOlunubNoteIds = null;
+    private ?array $icraOlunubNoteIds = null;
 
     private function getIcraOlunubNoteIds(): array
     {
-        if (self::$icraOlunubNoteIds === null) {
-            self::$icraOlunubNoteIds = ExecutionNote::all()
-                ->filter(fn($n) => mb_stripos($n->note, 'İcra olunub') !== false || mb_stripos($n->note, 'icra olunub') !== false)
-                ->pluck('id')->toArray();
-        }
-        return self::$icraOlunubNoteIds;
+        return $this->icraOlunubNoteIds ??= ExecutionNote::active()
+            ->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))
+            ->pluck('id')
+            ->toArray();
     }
 
     private function isIcraOlunubNote(?int $noteId): bool
@@ -40,7 +38,17 @@ class ExecutorDashboardController extends Controller
         if (!$user->executor_id && !$user->canManage() && !$user->department_id)
             abort(403, 'Sizin icraçı profiliniz yoxdur.');
         $executionNotes = ExecutionNote::active()->get();
-        $allExecutors   = $user->canManage() ? \App\Models\Executor::with('department')->active()->get() : collect();
+
+        // Admin sees all executors; managers only see executors within their assignable dept subtree
+        if ($user->isAdmin()) {
+            $allExecutors = \App\Models\Executor::with('department')->active()->get();
+        } elseif ($user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
+            $deptIds      = Department::descendantIdsOf($assignDeptId);
+            $allExecutors = \App\Models\Executor::with('department')->active()->whereIn('department_id', $deptIds)->get();
+        } else {
+            $allExecutors = collect();
+        }
+
         return view('executor.index', compact('executionNotes', 'allExecutors'));
     }
 
@@ -57,7 +65,7 @@ class ExecutorDashboardController extends Controller
         // Determine which executor IDs this user can see tasks for
         $visibleExecutorIds = $this->resolveVisibleExecutorIds($user, $executorId);
 
-        if (empty($visibleExecutorIds) && !$user->canManage()) {
+        if (empty($visibleExecutorIds) && !$user->isAdmin()) {
             return response()->json(['draw' => (int) $request->input('draw', 1), 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
         }
 
@@ -444,14 +452,32 @@ class ExecutorDashboardController extends Controller
 
     /**
      * Resolve which executor IDs this user may see tasks for.
-     * - Admin/manager: returns the requested executorId or empty (all)
-     * - Executor user: their own executor_id
+     * - Admin: requested executor or empty (meaning all)
+     * - Manager: restricted to their assignable dept subtree; must not cross into other managers' scopes
+     * - Executor user: their own executor_id only
      * - Dept user (no executor_id): all executors in dept subtree
      */
     private function resolveVisibleExecutorIds($user, ?int $requestedExecutorId): array
     {
-        if ($user->canManage()) {
+        if ($user->isAdmin()) {
             return $requestedExecutorId ? [$requestedExecutorId] : [];
+        }
+
+        if ($user->canManage()) {
+            $assignDeptId = $user->canAssignDeptId();
+            if (!$assignDeptId) return [];
+
+            $deptIds = Department::descendantIdsOf($assignDeptId);
+            $scopeIds = \App\Models\Executor::whereIn('department_id', $deptIds)
+                ->where('is_deleted', false)
+                ->pluck('id')
+                ->toArray();
+
+            if ($requestedExecutorId) {
+                // Silently reject requests for executors outside this manager's scope
+                return in_array($requestedExecutorId, $scopeIds) ? [$requestedExecutorId] : [];
+            }
+            return $scopeIds;
         }
 
         // Direct executor
@@ -459,7 +485,7 @@ class ExecutorDashboardController extends Controller
             return [$user->executor_id];
         }
 
-        // Dept supervisor: see all executors in dept subtree
+        // Dept user: see all executors in dept subtree
         if ($user->department_id) {
             $deptIds = Department::descendantIdsOf($user->department_id);
             return \App\Models\Executor::whereIn('department_id', $deptIds)
@@ -498,13 +524,23 @@ class ExecutorDashboardController extends Controller
 
     /**
      * Authorize read access to a legal act.
-     * - Admin/manager: always allowed
+     * - Admin: always allowed
+     * - Manager: only if the act has an executor within their assignable dept subtree
      * - Executor: must be assigned to the act
      * - Dept user: any executor in their subtree must be assigned
      */
     private function authorizeAccess(LegalAct $legalAct, $user): void
     {
-        if ($user->canManage()) return;
+        if ($user->isAdmin()) return;
+
+        if ($user->canManage()) {
+            $assignDeptId = $user->canAssignDeptId();
+            if ($assignDeptId) {
+                $deptIds = Department::descendantIdsOf($assignDeptId);
+                if ($legalAct->executors()->whereIn('executors.department_id', $deptIds)->exists()) return;
+            }
+            abort(403, 'Bu sənədə giriş icazəniz yoxdur.');
+        }
 
         // Direct executor assignment
         if ($user->executor_id && $legalAct->executors()->where('executors.id', $user->executor_id)->exists()) {

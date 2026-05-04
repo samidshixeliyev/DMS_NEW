@@ -12,9 +12,10 @@ class ApprovalController extends Controller
 {
     private function getIcraOlunubNoteIds(): array
     {
-        return ExecutionNote::all()
-            ->filter(fn($n) => mb_stripos(mb_strtolower($n->note, 'UTF-8'), mb_strtolower('icra olunub', 'UTF-8')) !== false)
-            ->pluck('id')->toArray();
+        return ExecutionNote::active()
+            ->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))
+            ->pluck('id')
+            ->toArray();
     }
 
     private function getSubmittedByHtml(ExecutorStatusLog $log): string
@@ -28,15 +29,14 @@ class ApprovalController extends Controller
             return e($log->user->name ?? '-');
         }
 
+        // Use already-eager-loaded executors from the relation instead of a fresh DB query
+        $executors = $log->legalAct->executors->keyBy('id');
+
         $html = '';
         foreach ($allPendingLogs as $pLog) {
             $executorId = $pLog->user?->executor_id;
-            $role       = null;
-            if ($executorId) {
-                $pivot = LegalAct::find($log->legal_act_id)?->executors()->where('executors.id', $executorId)->first()?->pivot;
-                $role  = $pivot?->role;
-            }
-            $roleLabel = $role === 'main' ? 'Əsas' : 'Digər';
+            $role       = $executorId ? $executors->get($executorId)?->pivot?->role : null;
+            $roleLabel  = $role === 'main' ? 'Əsas' : 'Digər';
             $html .= '<div><strong>' . e($roleLabel) . ':</strong> ' . e($pLog->user->name ?? '-')
                 . ' <small class="text-muted">(' . e($pLog->executionNote->note ?? '') . ')</small></div>';
         }
@@ -53,10 +53,19 @@ class ApprovalController extends Controller
         $draw   = $request->input('draw', 1);
         $start  = $request->input('start', 0);
         $length = $request->input('length', 25);
+        $user   = auth()->user();
 
         $icraOlunubIds = $this->getIcraOlunubNoteIds();
         if (empty($icraOlunubIds)) {
             return response()->json(['draw' => (int) $draw, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
+        }
+
+        // Managers may only approve tasks their own organization created
+        if (!$user->isAdmin()) {
+            $assignDeptId = $user->canAssignDeptId();
+            if (!$assignDeptId) {
+                return response()->json(['draw' => (int) $draw, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
+            }
         }
 
         $pendingLogs = ExecutorStatusLog::with([
@@ -68,6 +77,11 @@ class ApprovalController extends Controller
             ->whereIn('execution_note_id', $icraOlunubIds)
             ->whereHas('legalAct', fn($q) => $q->where('is_deleted', false))
             ->orderBy('created_at', 'desc');
+
+        // Scope to the manager's own organization
+        if (!$user->isAdmin()) {
+            $pendingLogs->whereHas('legalAct', fn($q) => $q->where('organization_id', $assignDeptId));
+        }
 
         $totalRecords = (clone $pendingLogs)->count();
 
@@ -126,8 +140,18 @@ class ApprovalController extends Controller
         ]);
     }
 
+    private function authorizeApproval(LegalAct $legalAct): void
+    {
+        $user = auth()->user();
+        if ($user->isAdmin()) return;
+        $assignDeptId = $user->canAssignDeptId();
+        if ($assignDeptId && (int) $legalAct->organization_id === $assignDeptId) return;
+        abort(403, 'Bu əməliyyat üçün icazəniz yoxdur.');
+    }
+
     public function show(LegalAct $legalAct)
     {
+        $this->authorizeApproval($legalAct);
         $legalAct->load([
             'actType', 'issuingAuthority', 'executors.department',
             'statusLogs.executionNote', 'statusLogs.user',
@@ -177,6 +201,8 @@ class ApprovalController extends Controller
 
     public function approve(Request $request, ExecutorStatusLog $statusLog)
     {
+        $statusLog->load('legalAct');
+        $this->authorizeApproval($statusLog->legalAct);
         if ($statusLog->approval_status !== 'pending') {
             return back()->withErrors(['general' => 'Bu qeyd artıq işlənib.']);
         }
@@ -192,6 +218,8 @@ class ApprovalController extends Controller
 
     public function reject(Request $request, ExecutorStatusLog $statusLog)
     {
+        $statusLog->load('legalAct');
+        $this->authorizeApproval($statusLog->legalAct);
         if ($statusLog->approval_status !== 'pending') {
             return back()->withErrors(['general' => 'Bu qeyd artıq işlənib.']);
         }
