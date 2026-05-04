@@ -622,15 +622,24 @@
                             <i class="bi bi-check2-square" style="font-size:1rem; width:20px; text-align:center;"></i>
                             <span class="sidebar-text">Təsdiq Gözləyənlər
                                 @php
-                                    $icraNoteIds = \App\Models\ExecutionNote::all()
-                                        ->filter(fn($n) => mb_stripos($n->note, 'İcra olunub') !== false || mb_stripos($n->note, 'icra olunub') !== false)
+                                    $icraNoteIds = \App\Models\ExecutionNote::active()
+                                        ->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))
                                         ->pluck('id')
                                         ->toArray();
-                                    $pendingCount = count($icraNoteIds) > 0
-                                        ? \App\Models\ExecutorStatusLog::where('approval_status', 'pending')
+                                    $pendingCount = 0;
+                                    if (count($icraNoteIds) > 0) {
+                                        $authUser   = auth()->user();
+                                        $assignDeptId = $authUser->isAdmin() ? null : $authUser->canAssignDeptId();
+                                        $pendingQuery = \App\Models\ExecutorStatusLog::where('approval_status', 'pending')
                                             ->whereIn('execution_note_id', $icraNoteIds)
-                                            ->count()
-                                        : 0;
+                                            ->whereHas('legalAct', fn($q) => $q->where('is_deleted', false));
+                                        if (!$authUser->isAdmin() && $assignDeptId) {
+                                            $pendingQuery->whereHas('legalAct', fn($q) => $q->where('organization_id', $assignDeptId));
+                                        } elseif (!$authUser->isAdmin()) {
+                                            $pendingQuery->whereRaw('1 = 0'); // no scope → no count
+                                        }
+                                        $pendingCount = $pendingQuery->count();
+                                    }
                                 @endphp
                                 @if($pendingCount > 0)
                                     <span class="badge bg-danger ms-1" style="font-size:0.65rem;">{{ $pendingCount }}</span>
@@ -691,9 +700,9 @@
                         class="nav-link-inner {{ request()->routeIs('executors.*') ? 'sidebar-nav-active' : '' }}"
                         style="display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.75rem; border-radius:8px; font-size:0.82rem; font-weight:500; color:rgba(255,255,255,0.7); text-decoration:none; transition:all 0.2s; border-left:3px solid transparent;">
                         <i class="bi bi-people" style="font-size:1rem; width:20px; text-align:center;"></i>
-                        <span class="sidebar-text">İcraçılar</span>
+                        <span class="sidebar-text">Rəhbərlər</span>
                     </a>
-                    <span class="sidebar-tooltip">İcraçılar</span>
+                    <span class="sidebar-tooltip">Rəhbərlər</span>
                 </div>
 
                 <div class="nav-item-wrapper" style="margin-bottom:2px;">
