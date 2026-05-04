@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="page-header">
-    <h2><i class="bi bi-people me-2"></i>İcraçılar</h2>
+    <h2><i class="bi bi-people me-2"></i>Rəhbərlər</h2>
     @if(in_array(auth()->user()->user_role, ['admin', 'manager']))
     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
         <i class="bi bi-plus-circle me-1"></i> Yeni əlavə et
@@ -39,7 +39,9 @@
                         <th style="background:#374151;color:#fff;text-align:center;width:150px;">Əməliyyat</th>
                     </tr>
                 </thead>
-                <tbody></tbody>
+                <tbody>
+
+                </tbody>
             </table>
         </div>
     </div>
@@ -51,7 +53,7 @@
             <form action="{{ route('executors.store') }}" method="POST">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Yeni icraçı</h5>
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>yeni icraçı</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -166,7 +168,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ],
         order: [[1, 'asc']], pageLength: 25, lengthMenu: [10, 25, 50, 100],
         dom: '<"d-flex justify-content-between align-items-center flex-wrap px-3 pt-2"l>rt<"d-flex justify-content-between align-items-center flex-wrap px-3 pb-2"ip>',
-        language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "İcraçı tapılmadı", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı", search: "Axtar:" }
+        language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "İcraçı tapılmadı", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur",
+                    infoFiltered: "(ümumi _MAX_ qeyddən)", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı", search: "Axtar:" }
     });
 });
 

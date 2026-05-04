@@ -134,7 +134,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ],
         order: [[1, 'asc']], pageLength: 25, lengthMenu: [10, 25, 50, 100],
         dom: '<"d-flex justify-content-between align-items-center flex-wrap px-3 pt-2"l>rt<"d-flex justify-content-between align-items-center flex-wrap px-3 pb-2"ip>',
-        language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "Akt növü tapılmadı", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı", search: "Axtar:" }
+        language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "Akt növü tapılmadı", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur",
+                    infoFiltered: "(ümumi _MAX_ qeyddən)", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı", search: "Axtar:" }
     });
 });
 

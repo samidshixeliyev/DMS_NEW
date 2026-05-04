@@ -199,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
             emptyTable: "İdarə tapılmadı",
             info: "_START_-_END_ / _TOTAL_",
             infoEmpty: "Məlumat yoxdur",
+                    infoFiltered: "(ümumi _MAX_ qeyddən)",
             lengthMenu: "_MENU_ nəticə",
             processing: "Yüklənir...",
             zeroRecords: "Tapılmadı",

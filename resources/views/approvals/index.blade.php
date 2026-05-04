@@ -279,9 +279,11 @@
                     emptyTable: "Təsdiq gözləyən sənəd yoxdur",
                     info: "_START_-_END_ / _TOTAL_",
                     infoEmpty: "Məlumat yoxdur",
+                    infoFiltered: "(ümumi _MAX_ qeyddən)",
                     lengthMenu: "_MENU_ nəticə",
                     processing: "Yüklənir...",
-                    zeroRecords: "Tapılmadı"
+                    zeroRecords: "Tapılmadı",
+                    search: "Axtar:"
                 }
             });
         });

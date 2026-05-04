@@ -338,6 +338,17 @@
         </div>
     </div>
 
+    {{-- Organization tabs (only shown when user can see tasks from multiple orgs) --}}
+    @if($visibleOrgs->count() > 1)
+    <div class="mb-3 d-flex align-items-center gap-2 flex-wrap" id="orgTabBar">
+        <span class="text-muted fw-semibold" style="font-size:0.82rem">İdarə:</span>
+        <button type="button" class="btn btn-sm btn-primary org-tab active" data-org-id="">Hamısı</button>
+        @foreach($visibleOrgs as $org)
+        <button type="button" class="btn btn-sm btn-outline-primary org-tab" data-org-id="{{ $org->id }}">{{ $org->name }}</button>
+        @endforeach
+    </div>
+    @endif
+
     {{-- Table --}}
     <div class="card">
         <div class="card-body p-0">
@@ -621,6 +632,7 @@
                 if ((v = $('#filter_deadline_status').val())) p['col[deadline_status]'] = v;
                 if ((v = $('#filter_task_number').val()) && v.trim()) p['col[task_number]'] = v.trim();
                 if ((v = $('#filter_department').val())) p['col[department_id]'] = v;
+                if (window._activeOrgId) p['col[organization_id]'] = window._activeOrgId;
                 var d = rr(fpDate); if (d.from) { p['col[legal_act_date_from]'] = d.from; p['col[legal_act_date_to]'] = d.to; }
                 var l = rr(fpDead); if (l.from) { p['col[deadline_from]'] = l.from; p['col[deadline_to]'] = l.to; }
                 return p;
@@ -665,13 +677,20 @@
                     { text: '<i class="bi bi-file-earmark-excel me-1"></i> Excel', className: 'btn btn-primary btn-sm', action: function () { xf('excel'); } },
                     { text: '<i class="bi bi-file-earmark-word me-1"></i> Word', className: 'btn btn-info btn-sm', action: function () { xf('word'); } }
                 ],
-                language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "Məlumat yoxdur", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı" },
+                language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "Məlumat yoxdur", info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur", infoFiltered: "(ümumi _MAX_ qeyddən)", lengthMenu: "_MENU_ nəticə", processing: "Yüklənir...", zeroRecords: "Tapılmadı", search: "Axtar:" },
                 initComplete: function () {
                     var $sd = $('#legalActsTable').closest('[style*="overflow"]');
                     var $w = $('#legalActsTable_wrapper');
                     $sd.before($w.children('.d-flex').first());
                     $sd.after($w.find('.dataTables_info,.dataTables_paginate').closest('.d-flex'));
                 }
+            });
+
+            $('#orgTabBar').on('click', '.org-tab', function () {
+                $('#orgTabBar .org-tab').removeClass('btn-primary active').addClass('btn-outline-primary');
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary active');
+                window._activeOrgId = $(this).data('org-id') || '';
+                table.ajax.reload();
             });
 
             $('#filtersSearchBtn').on('click', function () { table.ajax.reload(); });
