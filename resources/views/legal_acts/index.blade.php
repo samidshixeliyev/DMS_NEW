@@ -338,13 +338,12 @@
         </div>
     </div>
 
-    {{-- Organization tabs (only shown when user can see tasks from multiple orgs) --}}
+    {{-- Org Tabs --}}
     @if($visibleOrgs->count() > 1)
     <div class="mb-3 d-flex align-items-center gap-2 flex-wrap" id="orgTabBar">
         <span class="text-muted fw-semibold" style="font-size:0.82rem">İdarə:</span>
-        <button type="button" class="btn btn-sm btn-primary org-tab active" data-org-id="">Hamısı</button>
         @foreach($visibleOrgs as $org)
-        <button type="button" class="btn btn-sm btn-outline-primary org-tab" data-org-id="{{ $org->id }}">{{ $org->name }}</button>
+        <button type="button" class="btn btn-sm {{ $loop->first ? 'btn-primary' : 'btn-outline-primary' }} org-tab{{ $loop->first ? ' active' : '' }}" data-org-id="{{ $org->id }}">{{ $org->name }}</button>
         @endforeach
     </div>
     @endif
@@ -635,6 +634,7 @@
                 if (window._activeOrgId) p['col[organization_id]'] = window._activeOrgId;
                 var d = rr(fpDate); if (d.from) { p['col[legal_act_date_from]'] = d.from; p['col[legal_act_date_to]'] = d.to; }
                 var l = rr(fpDead); if (l.from) { p['col[deadline_from]'] = l.from; p['col[deadline_to]'] = l.to; }
+                if (window._activeOrgId) p['col[organization_id]'] = window._activeOrgId;
                 return p;
             }
 
@@ -686,10 +686,18 @@
                 }
             });
 
+            // Initialize active org — first tab is selected by default
+            @if($visibleOrgs->count() > 0)
+            window._activeOrgId = {{ $visibleOrgs->first()->id }};
+            @else
+            window._activeOrgId = null;
+            @endif
+
+            // Org tab switching
             $('#orgTabBar').on('click', '.org-tab', function () {
-                $('#orgTabBar .org-tab').removeClass('btn-primary active').addClass('btn-outline-primary');
+                $('#orgTabBar .org-tab').removeClass('active btn-primary').addClass('btn-outline-primary');
                 $(this).removeClass('btn-outline-primary').addClass('btn-primary active');
-                window._activeOrgId = $(this).data('org-id') || '';
+                window._activeOrgId = $(this).data('org-id') || null;
                 table.ajax.reload();
             });
 
@@ -697,7 +705,15 @@
             $('#filtersResetBtn').on('click', function () {
                 $('#filter_legal_act_number,#filter_summary,#filter_task_number').val('');
                 $('#filter_act_type,#filter_issued_by,#filter_executor,#filter_deadline_status,#filter_department').val(null).trigger('change');
-                fpDate.clear(); fpDead.clear(); table.ajax.reload();
+                fpDate.clear(); fpDead.clear();
+                // Re-activate first org tab
+                var $tabs = $('#orgTabBar .org-tab');
+                if ($tabs.length) {
+                    $tabs.removeClass('active btn-primary').addClass('btn-outline-primary');
+                    $tabs.first().removeClass('btn-outline-primary').addClass('btn-primary active');
+                    window._activeOrgId = $tabs.first().data('org-id') || null;
+                }
+                table.ajax.reload();
             });
             $p.on('keydown', 'input.filter-el', function (e) { if (e.key === 'Enter') { e.preventDefault(); table.ajax.reload(); } });
             window.xf = function (t) { var p = new URLSearchParams(gfp()); window.location.href = (t === 'excel' ? "{{ route('legal-acts.export.excel') }}" : "{{ route('legal-acts.export.word') }}") + '?' + p.toString(); };

@@ -40,6 +40,15 @@ class LegalActController extends Controller
             $executors = collect();
         }
 
+        // Visible organizations for the org tab filter
+        if ($user->isAdmin()) {
+            $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
+        } elseif ($user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
+            $visibleOrgs = Department::active()->where('id', $assignDeptId)->get();
+        } else {
+            $visibleOrgs = collect();
+        }
+
         $pendingApprovalCount = 0;
         if ($canManage && $user->department?->can_assign) {
             $icraIds = ExecutionNote::active()->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))->pluck('id')->toArray();
@@ -85,6 +94,9 @@ class LegalActController extends Controller
 
         $totalQuery = LegalAct::active();
         $this->applyVisibilityScope($totalQuery, $user);
+        if ($request->filled('col.organization_id')) {
+            $totalQuery->where('organization_id', (int) $request->input('col.organization_id'));
+        }
         $totalRecords = (clone $totalQuery)->count();
 
         $query = $this->applyFilters($request);
@@ -768,7 +780,7 @@ class LegalActController extends Controller
             $query->whereHas('executors', fn($q) => $q->where('department_id', $request->input('col.department_id')));
         }
         if ($request->filled('col.organization_id')) {
-            $query->where('organization_id', $request->input('col.organization_id'));
+            $query->where('organization_id', (int) $request->input('col.organization_id'));
         }
         if ($request->filled('col.deadline_status')) {
             $status      = $request->input('col.deadline_status');
