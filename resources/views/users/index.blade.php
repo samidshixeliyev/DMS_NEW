@@ -339,15 +339,24 @@
 
         function toggleExecutorFields(prefix) {
             var role = document.getElementById(prefix + '_user_role').value;
+            var isExecutor = (role === 'executor');
+            var isManager  = (role === 'manager');
 
             // Show executor-specific fields only for executor role
-            var fields = document.querySelectorAll('.executor-fields-' + prefix);
-            fields.forEach(function (el) {
-                el.style.display = (role === 'executor') ? 'block' : 'none';
+            document.querySelectorAll('.executor-fields-' + prefix).forEach(function (el) {
+                el.style.display = isExecutor ? 'block' : 'none';
             });
 
+            // Clear executor_id when switching away from executor role
+            if (!isExecutor) {
+                var execSelect = document.getElementById(prefix + '_executor_id');
+                if (execSelect) {
+                    execSelect.value = '';
+                    if ($(execSelect).data('select2')) $(execSelect).val('').trigger('change');
+                }
+            }
+
             // Department field is required for manager role
-            var isManager = (role === 'manager');
             var deptSelect = document.getElementById(prefix + '_department_id');
             if (deptSelect) deptSelect.required = isManager;
 
@@ -387,7 +396,7 @@
             document.getElementById('edit_username').value = data.username || '';
             document.getElementById('edit_user_role').value = data.user_role || 'user';
             var deptSelect = document.getElementById('edit_department_id');
-            deptSelect.innerHTML = '<option value="">Seç (ixtiyari)</option>';
+            deptSelect.innerHTML = '<option value="">Seç</option>';
             if (data.departments && Array.isArray(data.departments)) {
                 data.departments.forEach(function (dept) {
                     var option = document.createElement('option');
@@ -406,7 +415,8 @@
                     var option = document.createElement('option');
                     option.value = exec.id;
                     option.textContent = exec.name + dept;
-                    if (exec.id == data.executor_id) option.selected = true;
+                    // Only pre-select executor when the user's current role is executor
+                    if (data.user_role === 'executor' && exec.id == data.executor_id) option.selected = true;
                     select.appendChild(option);
                 });
             }

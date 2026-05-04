@@ -33,6 +33,11 @@ class UserController extends Controller
 
         $validated['password'] = Hash::make($validated['password']);
 
+        // executor_id is only meaningful for the executor role
+        if ($validated['user_role'] !== 'executor') {
+            $validated['executor_id'] = null;
+        }
+
         User::create($validated);
 
         return redirect()->route('users.index')->with('success', 'İstifadəçi uğurla yaradıldı.');
@@ -88,6 +93,11 @@ class UserController extends Controller
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
+        }
+
+        // executor_id is only meaningful for the executor role
+        if ($validated['user_role'] !== 'executor') {
+            $validated['executor_id'] = null;
         }
 
         $user->update($validated);

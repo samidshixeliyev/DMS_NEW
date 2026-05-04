@@ -85,20 +85,20 @@ class User extends Authenticatable
 
     /**
      * Check if user can create and assign tasks.
-     * True for admin, or for any user (including manager) whose department (or ancestor) has can_assign=true.
+     * Only admin, or managers whose department (or ancestor) has can_assign=true.
      */
     public function canAssignTasks(): bool
     {
-        return $this->isAdmin() || $this->canAssignDeptId() !== null;
+        return $this->isAdmin() || ($this->user_role === 'manager' && $this->canAssignDeptId() !== null);
     }
 
     /**
      * Check if user may create legal acts.
-     * True for admin, or for any user (including manager) whose department (or ancestor) has can_assign=true.
+     * Only admin, or managers whose department (or ancestor) has can_assign=true.
      */
     public function canCreateLegalActs(): bool
     {
-        return $this->isAdmin() || $this->canAssignDeptId() !== null;
+        return $this->isAdmin() || ($this->user_role === 'manager' && $this->canAssignDeptId() !== null);
     }
 
     /**
