@@ -33,8 +33,8 @@ class UserController extends Controller
 
         $validated['password'] = Hash::make($validated['password']);
 
-        // executor_id is only meaningful for the executor role
-        if ($validated['user_role'] !== 'executor') {
+        // executor_id is only meaningful for executor and manager roles
+        if (!in_array($validated['user_role'], ['executor', 'manager'])) {
             $validated['executor_id'] = null;
         }
 
@@ -95,8 +95,8 @@ class UserController extends Controller
             unset($validated['password']);
         }
 
-        // executor_id is only meaningful for the executor role
-        if ($validated['user_role'] !== 'executor') {
+        // executor_id is only meaningful for executor and manager roles
+        if (!in_array($validated['user_role'], ['executor', 'manager'])) {
             $validated['executor_id'] = null;
         }
 

@@ -26,7 +26,7 @@ class LegalActController extends Controller
         $isAdmin   = $user->isAdmin();
 
         $actTypes            = ActType::active()->get();
-        $issuingAuthorities  = IssuingAuthority::active()->get();
+        $issuingAuthorities  = IssuingAuthority::active()->get(); //kim qebul edib
         $executionNotes      = ExecutionNote::active()->get();
         $departments         = Department::active()->get();
 
@@ -42,15 +42,24 @@ class LegalActController extends Controller
 
         $pendingApprovalCount = 0;
         if ($canManage && $user->department?->can_assign) {
-            $icraIds = \App\Models\ExecutionNote::all()
-                ->filter(fn($n) => mb_stripos($n->note, 'İcra olunub') !== false)
-                ->pluck('id')->toArray();
+            $icraIds = ExecutionNote::active()->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))->pluck('id')->toArray();
             $pendingApprovalCount = count($icraIds) > 0
                 ? ExecutorStatusLog::pending()
                     ->whereIn('execution_note_id', $icraIds)
                     ->whereHas('legalAct', fn($q) => $q->where('organization_id', $user->department_id)->where('is_deleted', false))
                     ->count()
                 : 0;
+        }
+
+        // Organizations whose tasks this user can see — used to render org-filter tabs
+        // Ordered ancestors-first, own dept last (top of hierarchy → bottom)
+        $visibleOrgs = collect();
+        if ($assignDeptId = $user->canAssignDeptId()) {
+            $own         = Department::find($assignDeptId);
+            $ancestorIds = $own?->ancestorIds() ?? [];
+            $allIds      = array_merge($ancestorIds, [$assignDeptId]);
+            $orgs        = Department::whereIn('id', $allIds)->get()->keyBy('id');
+            $visibleOrgs = collect($allIds)->map(fn($id) => $orgs->get($id))->filter();
         }
 
         return view('legal_acts.index', compact(
@@ -62,7 +71,8 @@ class LegalActController extends Controller
             'canManage',
             'canAssign',
             'isAdmin',
-            'pendingApprovalCount'
+            'pendingApprovalCount',
+            'visibleOrgs'
         ));
     }
 
@@ -238,6 +248,8 @@ class LegalActController extends Controller
                 'insertedUser'     => $act->insertedUser?->executor
                     ? e($act->insertedUser->executor->name) . ($act->insertedUser->executor->position ? '<br><small class="text-muted">' . e($act->insertedUser->executor->position) . '</small>' : '')
                     : '-',
+                'organizationId'   => $act->organization_id,
+                'organizationName' => $act->organization?->name ?? '-',
                 'canEdit'          => ($userId === $act->inserted_user_id) || $canManage,
                 'canDelete'        => $isAdmin,
                 'hasPendingApproval' => $anyPending,
@@ -340,9 +352,14 @@ class LegalActController extends Controller
         $user = auth()->user();
 
         if ($user->canManage()) {
-            if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id) {
-                abort(403);
+            $assignDeptId = $user->canAssignDeptId();
+            if ($assignDeptId) {
+                $allowedOrgIds = Department::descendantIdsOf($assignDeptId);
+                if (!in_array((int) $legalAct->organization_id, $allowedOrgIds)) {
+                    abort(403);
+                }
             }
+            // Manager without any can_assign ancestry: may view all acts
         } elseif (!$this->userCanViewAct($legalAct, $user)) {
             abort(403);
         }
@@ -426,8 +443,12 @@ class LegalActController extends Controller
         $user = auth()->user();
 
         if ($user->canManage()) {
-            if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id) {
-                abort(403);
+            $assignDeptId = $user->canAssignDeptId();
+            if ($assignDeptId) {
+                $allowedOrgIds = Department::descendantIdsOf($assignDeptId);
+                if (!in_array((int) $legalAct->organization_id, $allowedOrgIds)) {
+                    abort(403);
+                }
             }
         } elseif (auth()->id() !== $legalAct->inserted_user_id) {
             abort(403);
@@ -612,47 +633,88 @@ class LegalActController extends Controller
 
     /**
      * Apply role-based visibility scope to a query.
-     * Admin/manager see all. Others see acts where their dept (or any descendant) is an executor.
+     *
+     * Rules:
+     *  - can_assign users: see tasks their org created + tasks from ancestor orgs flowing into their subtree
+     *  - pure managers (no can_assign): see tasks where their subtree has executors
+     *  - pure executors: see only tasks they are personally assigned to
      */
     private function applyVisibilityScope($query, $user): void
     {
-        if ($user->canManage()) {
-            if ($user->department?->can_assign) {
-                $query->where('organization_id', $user->department_id);
-            } else {
-                if ($user->department_id) {
-                    $deptIds = Department::descendantIdsOf($user->department_id);
-                    $query->whereHas('executors', fn($sq) => $sq->whereIn('executors.department_id', $deptIds));
+        $assignDeptId = $user->canAssignDeptId();
+
+        if ($assignDeptId) {
+            $ancestorIds        = Department::find($assignDeptId)?->ancestorIds() ?? [];
+            // Use the user's own dept subtree (not canAssignDept subtree) so that users
+            // whose nearest can_assign ancestor is a parent dept don't see tasks assigned
+            // to that parent dept by an even-higher org.
+            $ownSubtreeDeptIds  = Department::descendantIdsOf($user->department_id ?? $assignDeptId);
+
+            $query->where(function ($q) use ($user, $assignDeptId, $ownSubtreeDeptIds, $ancestorIds) {
+                // Tasks this organization created
+                $q->where('organization_id', $assignDeptId);
+
+                // Tasks from ancestor orgs assigned into this user's own dept subtree
+                if (!empty($ancestorIds)) {
+                    $q->orWhere(function ($sq) use ($ancestorIds, $ownSubtreeDeptIds) {
+                        $sq->whereIn('organization_id', $ancestorIds)
+                           ->whereHas('executors', fn($eq) => $eq->whereIn('executors.department_id', $ownSubtreeDeptIds));
+                    });
                 }
-            }
+
+                // Tasks personally assigned to this user (regardless of creating org)
+                if ($user->executor_id) {
+                    $q->orWhereHas('executors', fn($sq) => $sq->where('executors.id', $user->executor_id));
+                }
+            });
             return;
         }
 
-        $query->where(function ($q) use ($user) {
-            if ($user->executor_id) {
-                $q->whereHas('executors', fn($sq) => $sq->where('executors.id', $user->executor_id));
-            }
-            if ($user->department_id) {
-                $deptIds = Department::descendantIdsOf($user->department_id);
-                $q->orWhereHas('executors', fn($sq) => $sq->whereIn('executors.department_id', $deptIds));
-            }
-        });
+        if ($user->canManage() && $user->department_id) {
+            // Manager without a can_assign ancestry: see tasks where subtree executors are assigned
+            $deptIds = Department::descendantIdsOf($user->department_id);
+            $query->whereHas('executors', fn($sq) => $sq->whereIn('executors.department_id', $deptIds));
+            return;
+        }
+
+        // Pure executor with no can_assign ancestry: personally assigned tasks only
+        if ($user->executor_id) {
+            $query->whereHas('executors', fn($sq) => $sq->where('executors.id', $user->executor_id));
+        } else {
+            $query->whereRaw('1 = 0');
+        }
     }
 
     /**
      * Check whether a non-manager user may view a specific legal act.
+     * Mirrors applyVisibilityScope rules for single-record checks.
      */
     private function userCanViewAct(LegalAct $legalAct, $user): bool
     {
-        if ($user->executor_id && $legalAct->executors()->where('executors.id', $user->executor_id)->exists()) {
-            return true;
+        $assignDeptId = $user->canAssignDeptId();
+
+        if ($assignDeptId) {
+            if ((int) $legalAct->organization_id === $assignDeptId) return true;
+
+            $ancestorIds = Department::find($assignDeptId)?->ancestorIds() ?? [];
+            if (in_array((int) $legalAct->organization_id, $ancestorIds)) {
+                $ownSubtreeDeptIds = Department::descendantIdsOf($user->department_id ?? $assignDeptId);
+                if ($legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists()) {
+                    return true;
+                }
+            }
+
+            if ($user->executor_id && $legalAct->executors()->where('executors.id', $user->executor_id)->exists()) {
+                return true;
+            }
+
+            return false;
         }
-        if ($user->department_id) {
-            $deptIds = Department::descendantIdsOf($user->department_id);
-            return $legalAct->executors()
-                ->whereIn('executors.department_id', $deptIds)
-                ->exists();
+
+        if ($user->executor_id) {
+            return $legalAct->executors()->where('executors.id', $user->executor_id)->exists();
         }
+
         return false;
     }
 
@@ -667,6 +729,7 @@ class LegalActController extends Controller
             'statusLogs' => fn($q) => $q->with('executionNote', 'user')->reorder('created_at', 'asc'),
             'executors.users',
             'insertedUser.executor',
+            'organization',
         ])->active();
 
         $this->applyVisibilityScope($query, auth()->user());
@@ -704,13 +767,17 @@ class LegalActController extends Controller
         if ($request->filled('col.department_id')) {
             $query->whereHas('executors', fn($q) => $q->where('department_id', $request->input('col.department_id')));
         }
+        if ($request->filled('col.organization_id')) {
+            $query->where('organization_id', $request->input('col.organization_id'));
+        }
         if ($request->filled('col.deadline_status')) {
-            $status   = $request->input('col.deadline_status');
-            $today    = now()->startOfDay();
+            $status      = $request->input('col.deadline_status');
+            $today       = now()->startOfDay();
+            $icraNote    = fn($nq) => $nq->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%');
             $notExecuted = fn($q) => $q->whereDoesntHave('statusLogs')
                 ->orWhereDoesntHave('latestStatusLog', fn($sq) => $sq
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_APPROVED)
-                    ->whereHas('executionNote', fn($nq) => $nq->where('note', 'like', '%İcra olunub%')));
+                    ->whereHas('executionNote', $icraNote));
 
             if ($status === 'expired') {
                 $query->whereNotNull('execution_deadline')->where('execution_deadline', '<', $today)->where($notExecuted);
@@ -722,11 +789,11 @@ class LegalActController extends Controller
             } elseif ($status === 'executed') {
                 $query->whereHas('latestStatusLog', fn($q) => $q
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_APPROVED)
-                    ->whereHas('executionNote', fn($nq) => $nq->where('note', 'like', '%İcra olunub%')));
+                    ->whereHas('executionNote', $icraNote));
             } elseif ($status === 'pending') {
                 $query->whereHas('latestStatusLog', fn($q) => $q
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_PENDING)
-                    ->whereHas('executionNote', fn($nq) => $nq->where('note', 'like', '%İcra olunub%')));
+                    ->whereHas('executionNote', $icraNote));
             }
         }
         if ($request->filled('col.execution_note_id')) {

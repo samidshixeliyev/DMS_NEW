@@ -170,7 +170,7 @@
                                 </select>
                             </div>
                             <div class="col-12 executor-fields-create"
-                                style="display: {{ old('user_role') === 'executor' ? 'block' : 'none' }};">
+                                style="display: {{ in_array(old('user_role'), ['executor', 'manager']) ? 'block' : 'none' }};">
                                 <label class="form-label">Rəhbər icraçı</label>
                                 <select name="executor_id" class="form-select">
                                     <option value="">Seç (ixtiyari)</option>
@@ -339,16 +339,17 @@
 
         function toggleExecutorFields(prefix) {
             var role = document.getElementById(prefix + '_user_role').value;
-            var isExecutor = (role === 'executor');
-            var isManager  = (role === 'manager');
+            var isExecutor        = (role === 'executor');
+            var isManager         = (role === 'manager');
+            var showExecutorField = isExecutor || isManager;
 
-            // Show executor-specific fields only for executor role
+            // Executor field visible for both executor and manager roles
             document.querySelectorAll('.executor-fields-' + prefix).forEach(function (el) {
-                el.style.display = isExecutor ? 'block' : 'none';
+                el.style.display = showExecutorField ? 'block' : 'none';
             });
 
-            // Clear executor_id when switching away from executor role
-            if (!isExecutor) {
+            // Clear executor_id only when switching to admin or user roles
+            if (!showExecutorField) {
                 var execSelect = document.getElementById(prefix + '_executor_id');
                 if (execSelect) {
                     execSelect.value = '';
@@ -415,8 +416,8 @@
                     var option = document.createElement('option');
                     option.value = exec.id;
                     option.textContent = exec.name + dept;
-                    // Only pre-select executor when the user's current role is executor
-                    if (data.user_role === 'executor' && exec.id == data.executor_id) option.selected = true;
+                    // Pre-select executor for executor and manager roles
+                    if (['executor', 'manager'].includes(data.user_role) && exec.id == data.executor_id) option.selected = true;
                     select.appendChild(option);
                 });
             }
