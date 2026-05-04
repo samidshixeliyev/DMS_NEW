@@ -183,7 +183,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İmtina</button>
-                        <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i>
+                        <button type="submit" id="approveSaveBtn" class="btn btn-success"><i class="bi bi-check-circle me-1"></i>
                             Təsdiqlə</button>
                     </div>
                 </form>
@@ -212,7 +212,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İmtina</button>
-                        <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle me-1"></i> İmtina Et</button>
+                        <button type="submit" id="rejectSaveBtn" class="btn btn-danger"><i class="bi bi-x-circle me-1"></i> İmtina Et</button>
                     </div>
                 </form>
             </div>
@@ -351,5 +351,17 @@
             document.querySelector('#rejectForm textarea[name="approval_note"]').value = '';
             new bootstrap.Modal(document.getElementById('rejectModal')).show();
         }
+
+        document.getElementById('approveForm').addEventListener('submit', function () {
+            var btn = document.getElementById('approveSaveBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Göndərilir...';
+        });
+
+        document.getElementById('rejectForm').addEventListener('submit', function () {
+            var btn = document.getElementById('rejectSaveBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Göndərilir...';
+        });
     </script>
 @endpush
