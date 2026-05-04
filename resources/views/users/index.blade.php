@@ -37,87 +37,23 @@
 
     <div class="card">
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
+            <div style="overflow-x:auto;">
+                <table class="table table-hover table-bordered mb-0" id="usersTable" style="width:100%">
                     <thead>
                         <tr>
-                            <th style="width: 60px">ID</th>
-                            <th>Ad</th>
-                            <th>Soyad</th>
-                            <th>İstifadəçi adı</th>
-                            <th>Rol</th>
-                            <th>Rəhbər icraçı</th>
-                            <th>Şöbə</th>
-                            <th style="width: 150px">Əməliyyatlar</th>
+                            <th style="background:#1e3a5f;color:#fff;text-align:center;width:60px;">#</th>
+                            <th style="background:#1e3a5f;color:#fff;">Ad</th>
+                            <th style="background:#1e3a5f;color:#fff;">Soyad</th>
+                            <th style="background:#1e3a5f;color:#fff;">İstifadəçi adı</th>
+                            <th style="background:#1e3a5f;color:#fff;text-align:center;">Rol</th>
+                            <th style="background:#1e3a5f;color:#fff;">Rəhbər icraçı</th>
+                            <th style="background:#1e3a5f;color:#fff;">Şöbə</th>
+                            <th style="background:#374151;color:#fff;text-align:center;width:130px;">Əməliyyat</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @forelse($users as $user)
-                            <tr>
-                                <td><span class="badge bg-secondary">{{ $user->id }}</span></td>
-                                <td>{{ $user->name }}</td>
-                                <td>{{ $user->surname }}</td>
-                                <td><code>{{ $user->username }}</code></td>
-                                <td>
-                                    @if($user->user_role === 'admin')
-                                        <span class="badge bg-danger">Admin</span>
-                                    @elseif($user->user_role === 'manager')
-                                        <span class="badge bg-primary">Menecer</span>
-                                    @elseif($user->user_role === 'executor')
-                                        <span class="badge bg-info">İcraçı</span>
-                                    @else
-                                        <span class="badge bg-secondary">İstifadəçi</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if($user->executor)
-                                        <span class="badge"
-                                            style="background: var(--primary-light)">{{ $user->executor->name }}</span>
-                                        @if($user->executor->department)
-                                            <br><small class="text-muted">{{ $user->executor->department->name }}</small>
-                                        @endif
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-                                <td>{{ $user->department?->name ?: '-' }}</td>
-                                <td>
-                                    <div class="action-btns">
-                                        <button type="button" class="btn btn-sm btn-info" title="Bax"
-                                            onclick="showDetails({{ $user->id }})">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-warning" title="Redaktə et"
-                                            onclick="editRecord({{ $user->id }})">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        @if($user->id !== auth()->id())
-                                            <button type="button" class="btn btn-sm btn-danger" title="Sil"
-                                                onclick="deleteRecord({{ $user->id }})">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8">
-                                    <div class="empty-state">
-                                        <i class="bi bi-person-gear d-block"></i>
-                                        <p class="mb-0">İstifadəçi tapılmadı</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
-            @if($users->hasPages())
-                <div class="p-3 border-top">
-                    {{ $users->links() }}
-                </div>
-            @endif
         </div>
     </div>
 
@@ -144,8 +80,8 @@
                             </div>
                             <div class="col-12">
                                 <label class="form-label">İstifadəçi adı <span class="text-danger">*</span></label>
-                                <input type="text" name="username" class="form-control" value="{{ old('username') }}"
-                                    required>
+                                <input type="text" name="username" id="create_username" class="form-control" value="{{ old('username') }}" required autocomplete="off">
+                                <div id="create_username_feedback" class="form-text"></div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Şifrə <span class="text-danger">*</span></label>
@@ -229,7 +165,8 @@
                             </div>
                             <div class="col-12">
                                 <label class="form-label">İstifadəçi adı <span class="text-danger">*</span></label>
-                                <input type="text" name="username" id="edit_username" class="form-control" required>
+                                <input type="text" name="username" id="edit_username" class="form-control" required autocomplete="off">
+                                <div id="edit_username_feedback" class="form-text"></div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Yeni şifrə <small class="text-muted">(boş buraxın dəyişməmək
@@ -302,14 +239,97 @@
 @push('scripts')
     <script>
         const roleLabels = { admin: 'Admin', manager: 'Menecer', user: 'İstifadəçi', executor: 'İcraçı' };
+        const roleBadge  = {
+            admin:    '<span class="badge bg-danger">Admin</span>',
+            manager:  '<span class="badge bg-primary">Menecer</span>',
+            executor: '<span class="badge bg-info">İcraçı</span>',
+            user:     '<span class="badge bg-secondary">İstifadəçi</span>',
+        };
+
+        var usersTable;
 
         document.addEventListener('DOMContentLoaded', function () {
+            usersTable = $('#usersTable').DataTable({
+                processing: true, serverSide: true,
+                ajax: { url: "{{ route('users.load') }}", type: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken } },
+                columns: [
+                    { data: null, orderable: false, searchable: false, className: 'text-center',
+                      render: function (d, t, r, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
+                    { data: 'name' },
+                    { data: 'surname' },
+                    { data: 'username', render: function (d) { return '<code>' + escapeHtml(d) + '</code>'; } },
+                    { data: 'user_role', className: 'text-center',
+                      render: function (d) { return roleBadge[d] || escapeHtml(d); } },
+                    { data: null, orderable: false, searchable: false,
+                      render: function (d) {
+                          if (!d.executor) return '<span class="text-muted">-</span>';
+                          var html = '<span class="badge" style="background:var(--primary-light)">' + escapeHtml(d.executor) + '</span>';
+                          if (d.executorDept) html += '<br><small class="text-muted">' + escapeHtml(d.executorDept) + '</small>';
+                          return html;
+                      }},
+                    { data: 'department', render: function (d) { return d ? escapeHtml(d) : '<span class="text-muted">-</span>'; } },
+                    { data: null, orderable: false, searchable: false, className: 'text-center',
+                      render: function (d) {
+                          var h = '<div class="action-btns">';
+                          h += '<button class="btn btn-sm btn-info" title="Bax" onclick="showDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>';
+                          h += '<button class="btn btn-sm btn-warning" title="Redaktə" onclick="editRecord(' + d.id + ')"><i class="bi bi-pencil"></i></button>';
+                          if (!d.isSelf) h += '<button class="btn btn-sm btn-danger" title="Sil" onclick="deleteRecord(' + d.id + ')"><i class="bi bi-trash"></i></button>';
+                          return h + '</div>';
+                      }}
+                ],
+                order: [[0, 'asc']], pageLength: 25, lengthMenu: [10, 25, 50, 100],
+                dom: '<"d-flex justify-content-between align-items-center flex-wrap px-3 pt-2"lf>rt<"d-flex justify-content-between align-items-center flex-wrap px-3 pb-2"ip>',
+                language: { paginate: { previous: "&laquo;", next: "&raquo;" }, emptyTable: "İstifadəçi tapılmadı",
+                            info: "_START_-_END_ / _TOTAL_", infoEmpty: "Məlumat yoxdur",
+                            infoFiltered: "(ümumi _MAX_ qeyddən)", lengthMenu: "_MENU_ nəticə",
+                            processing: "Yüklənir...", zeroRecords: "Tapılmadı", search: "Axtar:" }
+            });
+
             // Sync role-dependent field state with any pre-filled old() values
             toggleExecutorFields('create');
 
             var $cm = $('#createModal');
             $cm.find('select').each(function () {
                 $(this).select2({ theme: 'bootstrap-5', dropdownParent: $cm.find('.modal-body'), placeholder: 'Seç', allowClear: true, width: '100%' });
+            });
+
+            // Username uniqueness live check
+            function debounce(fn, delay) {
+                var t; return function () { clearTimeout(t); t = setTimeout(fn.bind(this, ...arguments), delay); };
+            }
+            function checkUsername(inputId, feedbackId, excludeId) {
+                var val = document.getElementById(inputId).value.trim();
+                var fb  = document.getElementById(feedbackId);
+                if (!val) { fb.textContent = ''; fb.className = 'form-text'; return; }
+                fetch('{{ route('users.check-username') }}?username=' + encodeURIComponent(val) + (excludeId ? '&exclude_id=' + excludeId : ''))
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.exists) {
+                            fb.textContent = 'Bu istifadəçi adı artıq mövcuddur.';
+                            fb.className = 'form-text text-danger';
+                            document.getElementById(inputId).classList.add('is-invalid');
+                        } else {
+                            fb.textContent = 'İstifadəçi adı mövcud deyil.';
+                            fb.className = 'form-text text-success';
+                            document.getElementById(inputId).classList.remove('is-invalid');
+                        }
+                    });
+            }
+            document.getElementById('create_username').addEventListener('input', debounce(function () {
+                checkUsername('create_username', 'create_username_feedback', null);
+            }, 400));
+            document.getElementById('edit_username').addEventListener('input', debounce(function () {
+                var excludeId = (document.getElementById('editForm').action.match(/\/users\/(\d+)$/) || [])[1];
+                checkUsername('edit_username', 'edit_username_feedback', excludeId);
+            }, 400));
+            // Clear feedback when modals close
+            document.getElementById('createModal').addEventListener('hidden.bs.modal', function () {
+                document.getElementById('create_username_feedback').textContent = '';
+                document.getElementById('create_username').classList.remove('is-invalid');
+            });
+            document.getElementById('editModal').addEventListener('hidden.bs.modal', function () {
+                document.getElementById('edit_username_feedback').textContent = '';
+                document.getElementById('edit_username').classList.remove('is-invalid');
             });
 
             $(document).on('change', 'select[name="executor_id"]', function () {

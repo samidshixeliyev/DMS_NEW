@@ -12,9 +12,67 @@ class UserController extends Controller
 {
     public function index()
     {
-        $users = User::with(['executor.department', 'department'])->active()->orderBy('id', 'desc')->paginate(20);
         $executors = Executor::with('department')->active()->get();
-        return view('users.index', compact('users', 'executors'));
+        return view('users.index', compact('executors'));
+    }
+
+    public function load(Request $request)
+    {
+        $draw   = $request->input('draw', 1);
+        $start  = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 25);
+        $search = trim($request->input('search.value', ''));
+
+        $query = User::with(['executor.department', 'department'])->active();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('surname', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%")
+                  ->orWhere('user_role', 'like', "%{$search}%");
+            });
+        }
+
+        $total    = User::active()->count();
+        $filtered = (clone $query)->count();
+
+        $users = $query->orderBy('id', 'desc')->skip($start)->take($length)->get();
+
+        $roleMap = ['admin' => 'Admin', 'manager' => 'Menecer', 'user' => 'İstifadəçi', 'executor' => 'İcraçı'];
+
+        $data = $users->map(fn($u) => [
+            'id'           => $u->id,
+            'name'         => $u->name,
+            'surname'      => $u->surname,
+            'username'     => $u->username,
+            'user_role'    => $u->user_role,
+            'roleLabel'    => $roleMap[$u->user_role] ?? $u->user_role,
+            'executor'     => $u->executor?->name,
+            'executorDept' => $u->executor?->department?->name,
+            'department'   => $u->department?->name,
+            'isSelf'       => $u->id === auth()->id(),
+        ]);
+
+        return response()->json([
+            'draw'            => (int) $draw,
+            'recordsTotal'    => $total,
+            'recordsFiltered' => $filtered,
+            'data'            => $data,
+        ]);
+    }
+
+    public function checkUsername(Request $request)
+    {
+        $username  = $request->input('username', '');
+        $excludeId = $request->input('exclude_id');
+
+        $query = User::where('username', $username)->where('is_deleted', false);
+        if ($excludeId) {
+            $query->where('id', '!=', (int) $excludeId);
+        }
+
+        return response()->json(['exists' => $query->exists()]);
     }
 
     public function store(Request $request)

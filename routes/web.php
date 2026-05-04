@@ -110,6 +110,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::post('users/load', [UserController::class, 'load'])->name('users.load');
+        Route::get('users/check-username', [UserController::class, 'checkUsername'])->name('users.check-username');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::get('users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
