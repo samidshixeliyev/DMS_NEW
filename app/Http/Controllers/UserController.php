@@ -30,7 +30,8 @@ class UserController extends Controller
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('surname', 'like', "%{$search}%")
                   ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('user_role', 'like', "%{$search}%");
+                  ->orWhere('user_role', 'like', "%{$search}%")
+                  ->orWhereHas('department', fn($dq) => $dq->where('name', 'like', "%{$search}%"));
             });
         }
 
@@ -83,7 +84,9 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users,username',
             'password' => 'required|string|min:6|confirmed',
             'user_role' => 'required|in:admin,manager,user,executor',
-            'executor_id' => 'nullable|exists:executors,id',
+            'executor_id' => $request->input('user_role') === 'manager'
+                ? 'required|exists:executors,id'
+                : 'nullable|exists:executors,id',
             'department_id' => $request->input('user_role') === 'manager'
                 ? 'required|exists:departments,id'
                 : 'nullable|exists:departments,id',
@@ -141,7 +144,9 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:6|confirmed',
             'user_role' => 'required|in:admin,manager,user,executor',
-            'executor_id' => 'nullable|exists:executors,id',
+            'executor_id' => $request->input('user_role') === 'manager'
+                ? 'required|exists:executors,id'
+                : 'nullable|exists:executors,id',
             'department_id' => $request->input('user_role') === 'manager'
                 ? 'required|exists:departments,id'
                 : 'nullable|exists:departments,id',

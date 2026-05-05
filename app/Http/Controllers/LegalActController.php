@@ -791,20 +791,29 @@ class LegalActController extends Controller
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_APPROVED)
                     ->whereHas('executionNote', $icraNote));
 
-            if ($status === 'expired') {
-                $query->whereNotNull('execution_deadline')->where('execution_deadline', '<', $today)->where($notExecuted);
-            } elseif (in_array($status, ['0day', '1day', '2days', '3days'])) {
-                $days = (int) $status[0];
+            if ($status === 'last1day') {
                 $query->whereNotNull('execution_deadline')
-                    ->whereDate('execution_deadline', '=', $today->copy()->addDays($days))
+                    ->whereDate('execution_deadline', '>=', $today)
+                    ->whereDate('execution_deadline', '<=', $today->copy()->addDays(1))
+                    ->where($notExecuted);
+            } elseif ($status === 'last2days') {
+                $query->whereNotNull('execution_deadline')
+                    ->whereDate('execution_deadline', '>=', $today)
+                    ->whereDate('execution_deadline', '<=', $today->copy()->addDays(2))
+                    ->where($notExecuted);
+            } elseif ($status === 'last3days') {
+                $query->whereNotNull('execution_deadline')
+                    ->whereDate('execution_deadline', '>=', $today)
+                    ->whereDate('execution_deadline', '<=', $today->copy()->addDays(3))
+                    ->where($notExecuted);
+            } elseif ($status === 'expired3days') {
+                $query->whereNotNull('execution_deadline')
+                    ->whereDate('execution_deadline', '>=', $today->copy()->subDays(3))
+                    ->whereDate('execution_deadline', '<', $today)
                     ->where($notExecuted);
             } elseif ($status === 'executed') {
                 $query->whereHas('latestStatusLog', fn($q) => $q
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_APPROVED)
-                    ->whereHas('executionNote', $icraNote));
-            } elseif ($status === 'pending') {
-                $query->whereHas('latestStatusLog', fn($q) => $q
-                    ->where('approval_status', ExecutorStatusLog::APPROVAL_PENDING)
                     ->whereHas('executionNote', $icraNote));
             }
         }

@@ -107,9 +107,13 @@
                             </div>
                             <div class="col-12 executor-fields-create"
                                 style="display: {{ in_array(old('user_role'), ['executor', 'manager']) ? 'block' : 'none' }};">
-                                <label class="form-label">Rəhbər icraçı</label>
-                                <select name="executor_id" class="form-select">
-                                    <option value="">Seç (ixtiyari)</option>
+                                <label class="form-label">
+                                    Rəhbər icraçı
+                                    <span class="text-danger exec-required-create" style="display:{{ old('user_role') === 'manager' ? 'inline' : 'none' }};"> *</span>
+                                    <small class="text-muted exec-hint-create" style="display:{{ old('user_role') === 'manager' ? 'none' : 'inline' }};">(ixtiyari)</small>
+                                </label>
+                                <select name="executor_id" id="create_executor_id" class="form-select" {{ old('user_role') === 'manager' ? 'required' : '' }}>
+                                    <option value="">Seç</option>
                                     @foreach($executors as $executor)
                                         <option value="{{ $executor->id }}" {{ old('executor_id') == $executor->id ? 'selected' : '' }}>
                                             {{ $executor->name }}{{ $executor->department ? ' — ' . $executor->department->name : '' }}
@@ -188,9 +192,13 @@
                                 </select>
                             </div>
                             <div class="col-12 executor-fields-edit" style="display:none;">
-                                <label class="form-label">Rəhbər icraçı</label>
+                                <label class="form-label">
+                                    Rəhbər icraçı
+                                    <span class="text-danger exec-required-edit" style="display:none;"> *</span>
+                                    <small class="text-muted exec-hint-edit">(ixtiyari)</small>
+                                </label>
                                 <select name="executor_id" id="edit_executor_id" class="form-select">
-                                    <option value="">Seç (ixtiyari)</option>
+                                    <option value="">Seç</option>
                                 </select>
                             </div>
                             <div class="col-12">
@@ -376,6 +384,16 @@
                     if ($(execSelect).data('select2')) $(execSelect).val('').trigger('change');
                 }
             }
+
+            // Executor field is required for manager role
+            var execSelect = document.getElementById(prefix + '_executor_id');
+            if (execSelect) execSelect.required = isManager;
+
+            var execRequiredMark = document.querySelector('.exec-required-' + prefix);
+            if (execRequiredMark) execRequiredMark.style.display = isManager ? 'inline' : 'none';
+
+            var execHint = document.querySelector('.exec-hint-' + prefix);
+            if (execHint) execHint.style.display = isManager ? 'none' : 'inline';
 
             // Department field is required for manager role
             var deptSelect = document.getElementById(prefix + '_department_id');
