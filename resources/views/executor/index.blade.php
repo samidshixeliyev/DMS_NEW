@@ -388,10 +388,13 @@
                         data: null, orderable: false, searchable: false, render: function (d) {
                             var btns = '<div class="action-btns">';
                             btns += '<button class="btn btn-sm btn-info" title="Bax" onclick="showDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>';
+                            var execArg = d.actingAsExecutorId ? ',' + d.actingAsExecutorId : ',null';
                             if (d.canChangeStatus) {
-                                btns += '<button class="btn btn-sm btn-warning" title="Status dəyiş" onclick="changeStatus(' + d.id + ')"><i class="bi bi-pencil-square"></i></button>';
+                                var title = d.isAdminActingAs ? 'İcraçı adından status əlavə et' : 'Status dəyiş';
+                                btns += '<button class="btn btn-sm btn-warning" title="' + title + '" onclick="changeStatus(' + d.id + execArg + ')"><i class="bi bi-pencil-square"></i></button>';
                             } else if (d.canWithdraw) {
-                                btns += '<button class="btn btn-sm btn-outline-warning" title="Geri al (' + d.graceMinsLeft + ' dəq. qalıb)" onclick="withdrawStatus(' + d.id + ',' + d.graceMinsLeft + ')"><i class="bi bi-arrow-counterclockwise"></i></button>';
+                                var minsLabel = d.isAdminActingAs ? 'Admin' : (d.graceMinsLeft + ' dəq. qalıb');
+                                btns += '<button class="btn btn-sm btn-outline-warning" title="Geri al (' + minsLabel + ')" onclick="withdrawStatus(' + d.id + ',' + d.graceMinsLeft + execArg + ')"><i class="bi bi-arrow-counterclockwise"></i></button>';
                             } else {
                                 btns += '<button class="btn btn-sm btn-secondary" disabled title="Dəyişiklik mümkün deyil"><i class="bi bi-lock"></i></button>';
                             }
@@ -576,22 +579,44 @@
         }
 
         // ─── Change status ──────────────────────────────────────────────
-        function changeStatus(id) {
+        function changeStatus(id, actingAsExecutorId) {
             document.getElementById('statusForm').action = '/executor/legal-acts/' + id + '/status';
             document.getElementById('status_note').value = '';
             document.getElementById('attachmentWarning').style.display = 'none';
             document.querySelector('#statusForm textarea[name="custom_note"]').value = '';
             if (window._resetStatusFiles) window._resetStatusFiles();
+            // Inject on_behalf_of_executor_id for admin acting on behalf
+            var form = document.getElementById('statusForm');
+            var prev = form.querySelector('input[name="on_behalf_of_executor_id"]');
+            if (prev) prev.remove();
+            if (actingAsExecutorId) {
+                var h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'on_behalf_of_executor_id'; h.value = actingAsExecutorId;
+                form.appendChild(h);
+            }
             new bootstrap.Modal(document.getElementById('statusModal')).show();
         }
 
         // ─── Withdraw status (1-hour grace period) ──────────────────────
-        function withdrawStatus(id, minsLeft) {
+        function withdrawStatus(id, minsLeft, actingAsExecutorId) {
             document.getElementById('withdrawForm').action = '/executor/legal-acts/' + id + '/withdraw-status';
             var note = document.getElementById('withdrawTimeNote');
-            note.textContent = minsLeft > 1
-                ? 'Düzəliş müddəti: ' + minsLeft + ' dəqiqə qalıb.'
-                : 'Düzəliş müddəti tükənmək üzrədir (1 dəqiqə).';
+            if (actingAsExecutorId) {
+                note.textContent = 'Admin olaraq bu icraçının statusunu geri alırsınız.';
+            } else {
+                note.textContent = minsLeft > 1
+                    ? 'Düzəliş müddəti: ' + minsLeft + ' dəqiqə qalıb.'
+                    : 'Düzəliş müddəti tükənmək üzrədir (1 dəqiqə).';
+            }
+            // Inject on_behalf_of_executor_id for admin acting on behalf
+            var form = document.getElementById('withdrawForm');
+            var prev = form.querySelector('input[name="on_behalf_of_executor_id"]');
+            if (prev) prev.remove();
+            if (actingAsExecutorId) {
+                var h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'on_behalf_of_executor_id'; h.value = actingAsExecutorId;
+                form.appendChild(h);
+            }
             new bootstrap.Modal(document.getElementById('withdrawModal')).show();
         }
     </script>

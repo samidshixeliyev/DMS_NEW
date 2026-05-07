@@ -50,20 +50,23 @@ class LegalActController extends Controller
         }
 
         $pendingApprovalCount = 0;
-        if ($canManage && $user->department?->can_assign) {
+        if ($canManage) {
             $icraIds = ExecutionNote::active()->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))->pluck('id')->toArray();
-            $pendingApprovalCount = count($icraIds) > 0
-                ? ExecutorStatusLog::pending()
-                    ->whereIn('execution_note_id', $icraIds)
-                    ->whereHas('legalAct', fn($q) => $q->where('organization_id', $user->department_id)->where('is_deleted', false))
-                    ->count()
-                : 0;
+            if (count($icraIds) > 0) {
+                $pendingQuery = ExecutorStatusLog::pending()->whereIn('execution_note_id', $icraIds);
+                if (!$user->isAdmin()) {
+                    $pendingQuery->whereHas('legalAct', fn($q) => $q->where('organization_id', $user->department_id)->where('is_deleted', false));
+                }
+                $pendingApprovalCount = $pendingQuery->count();
+            }
         }
 
         // Organizations whose tasks this user can see — used to render org-filter tabs
-        // Ordered ancestors-first, own dept last (top of hierarchy → bottom)
+        // Admin: all can_assign depts. Manager: own can_assign dept + ancestors. Others: empty.
         $visibleOrgs = collect();
-        if ($assignDeptId = $user->canAssignDeptId()) {
+        if ($user->isAdmin()) {
+            $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
+        } elseif ($assignDeptId = $user->canAssignDeptId()) {
             $own         = Department::find($assignDeptId);
             $ancestorIds = $own?->ancestorIds() ?? [];
             $allIds      = array_merge($ancestorIds, [$assignDeptId]);
@@ -660,6 +663,8 @@ class LegalActController extends Controller
      */
     private function applyVisibilityScope($query, $user): void
     {
+        if ($user->isAdmin()) return;
+
         $assignDeptId = $user->canAssignDeptId();
 
         if ($assignDeptId) {

@@ -196,16 +196,23 @@ class ExecutorDashboardController extends Controller
                 ? '<span class="badge bg-primary">Əsas</span>'
                 : '<span class="badge bg-info">Digər</span>';
 
-            // canChangeStatus only applies when the user is acting as their own executor
-            $isOwnExecutor = $primaryExecutorId && $primaryExecutorId === $user->executor_id;
+            // canChangeStatus applies for own executor OR admin acting as a specific executor
+            $isOwnExecutor   = $primaryExecutorId && $primaryExecutorId === $user->executor_id;
+            $isAdminActingAs = $user->isAdmin() && $executorId !== null;
+            $canAct          = $isOwnExecutor || $isAdminActingAs;
 
-            // 1-hour grace period: executor can withdraw their pending icra-olunub submission
+            // 1-hour grace period for executor; admin acting on behalf has no time limit
             $graceMinsLeft = null;
             $canWithdraw   = false;
-            if ($myIsPending && $isOwnExecutor && $myLatestLog) {
-                $minsElapsed   = (int) $myLatestLog->created_at->diffInMinutes(now());
-                $graceMinsLeft = max(0, 60 - $minsElapsed);
-                $canWithdraw   = $graceMinsLeft > 0;
+            if ($myIsPending && $canAct && $myLatestLog) {
+                if ($isAdminActingAs) {
+                    $graceMinsLeft = 999;
+                    $canWithdraw   = true;
+                } else {
+                    $minsElapsed   = (int) $myLatestLog->created_at->diffInMinutes(now());
+                    $graceMinsLeft = max(0, 60 - $minsElapsed);
+                    $canWithdraw   = $graceMinsLeft > 0;
+                }
             }
 
             $data[] = [
@@ -222,9 +229,11 @@ class ExecutorDashboardController extends Controller
                 'statusHtml'      => $statusHtml,
                 'roleHtml'        => $roleHtml,
                 'proofRequired'   => (bool) $act->proof_required,
-                'canChangeStatus' => !$myIsExecuted && !$myIsPending && $isOwnExecutor,
+                'canChangeStatus' => !$myIsExecuted && !$myIsPending && $canAct,
                 'canWithdraw'     => $canWithdraw,
                 'graceMinsLeft'   => $graceMinsLeft,
+                'isAdminActingAs' => $isAdminActingAs,
+                'actingAsExecutorId' => $isAdminActingAs ? $executorId : null,
             ];
         }
 
@@ -304,9 +313,23 @@ class ExecutorDashboardController extends Controller
         $user = auth()->user();
         $this->authorizeAccess($legalAct, $user);
 
-        // Only users acting as an executor can submit status
+        // Resolve the acting user: admin can act on behalf of an executor
+        $actingUserId = $user->id;
+        $isAdminOnBehalf = false;
         if (!$user->executor_id) {
-            abort(403, 'Yalnız icraçılar status göndərə bilər.');
+            if (!$user->isAdmin()) {
+                abort(403, 'Yalnız icraçılar status göndərə bilər.');
+            }
+            $onBehalfOfExecutorId = (int) $request->input('on_behalf_of_executor_id');
+            if (!$onBehalfOfExecutorId) {
+                return back()->withErrors(['general' => 'Admin olaraq status göndərmək üçün icraçı seçilməlidir.']);
+            }
+            $targetUser = \App\Models\User::where('executor_id', $onBehalfOfExecutorId)->where('is_deleted', false)->first();
+            if (!$targetUser) {
+                return back()->withErrors(['general' => 'Seçilmiş icraçıya aid istifadəçi tapılmadı.']);
+            }
+            $actingUserId = $targetUser->id;
+            $isAdminOnBehalf = true;
         }
 
         $validated = $request->validate([
@@ -316,12 +339,10 @@ class ExecutorDashboardController extends Controller
             'attachments.*'     => 'file|max:10240',
         ]);
 
-        $isIcraOlunub    = $this->isIcraOlunubNote((int) $validated['execution_note_id']);
-        $isQismenIcra    = $this->isQismenIcraNote((int) $validated['execution_note_id']);
-        $requiresAllExecutors = $isIcraOlunub || $isQismenIcra;
+        $isIcraOlunub = $this->isIcraOlunubNote((int) $validated['execution_note_id']);
 
         $myLatestIcraLog = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-            ->where('user_id', $user->id)
+            ->where('user_id', $actingUserId)
             ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
             ->orderByDesc('id')
             ->first();
@@ -332,8 +353,8 @@ class ExecutorDashboardController extends Controller
             }
             if (in_array($myLatestIcraLog->approval_status, ['pending', 'partial'])) {
                 $minsElapsed = (int) $myLatestIcraLog->created_at->diffInMinutes(now());
-                if ($minsElapsed <= 60) {
-                    // Within 1-hour grace period: remove the previous submission so this one replaces it
+                if ($isAdminOnBehalf || $minsElapsed <= 60) {
+                    // Admin on behalf: always replace. Executor: within 1-hour grace period.
                     $this->deleteStatusLog($myLatestIcraLog);
                 } else {
                     return back()->withErrors(['general' => 'Sizin təsdiq gözləyən icra qeydiniz var.']);
@@ -373,7 +394,7 @@ class ExecutorDashboardController extends Controller
 
         $statusLog = ExecutorStatusLog::create([
             'legal_act_id'      => $legalAct->id,
-            'user_id'           => $user->id,
+            'user_id'           => $actingUserId,
             'execution_note_id' => $validated['execution_note_id'],
             'custom_note'       => $validated['custom_note'] ?? null,
             'approval_status'   => $approvalStatus,
@@ -385,7 +406,7 @@ class ExecutorDashboardController extends Controller
                 $path = $file->store('execution-attachments/' . $legalAct->id, 'local');
                 ExecutionAttachment::create([
                     'legal_act_id'  => $legalAct->id,
-                    'user_id'       => $user->id,
+                    'user_id'       => $actingUserId,
                     'status_log_id' => $statusLog->id,
                     'file_path'     => $path,
                     'original_name' => $file->getClientOriginalName(),
@@ -402,18 +423,33 @@ class ExecutorDashboardController extends Controller
         return redirect()->route('executor.index')->with('success', $successMsg);
     }
 
-    public function withdrawStatus(LegalAct $legalAct)
+    public function withdrawStatus(Request $request, LegalAct $legalAct)
     {
         $user = auth()->user();
         $this->authorizeAccess($legalAct, $user);
 
+        // Resolve the acting user: admin can act on behalf of an executor
+        $actingUserId = $user->id;
+        $isAdminOnBehalf = false;
         if (!$user->executor_id) {
-            abort(403, 'Yalnız icraçılar status geri ala bilər.');
+            if (!$user->isAdmin()) {
+                abort(403, 'Yalnız icraçılar status geri ala bilər.');
+            }
+            $onBehalfOfExecutorId = (int) $request->input('on_behalf_of_executor_id');
+            if (!$onBehalfOfExecutorId) {
+                return back()->withErrors(['general' => 'Admin olaraq geri almaq üçün icraçı seçilməlidir.']);
+            }
+            $targetUser = \App\Models\User::where('executor_id', $onBehalfOfExecutorId)->where('is_deleted', false)->first();
+            if (!$targetUser) {
+                return back()->withErrors(['general' => 'Seçilmiş icraçıya aid istifadəçi tapılmadı.']);
+            }
+            $actingUserId = $targetUser->id;
+            $isAdminOnBehalf = true;
         }
 
-        // Check first if this user's icra-olunub log was already approved by a manager
+        // Block if the icra-olunub log was already approved by a manager
         $approvedLog = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-            ->where('user_id', $user->id)
+            ->where('user_id', $actingUserId)
             ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
             ->where('approval_status', 'approved')
             ->exists();
@@ -423,7 +459,7 @@ class ExecutorDashboardController extends Controller
         }
 
         $log = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-            ->where('user_id', $user->id)
+            ->where('user_id', $actingUserId)
             ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
             ->where('approval_status', 'pending')
             ->orderByDesc('id')
@@ -433,9 +469,12 @@ class ExecutorDashboardController extends Controller
             return back()->withErrors(['general' => 'Geri alınacaq icra qeydi tapılmadı.']);
         }
 
-        $minsElapsed = (int) $log->created_at->diffInMinutes(now());
-        if ($minsElapsed > 60) {
-            return back()->withErrors(['general' => '1 saatlıq düzəliş müddəti bitib. Statusu geri almaq mümkün deyil.']);
+        // Admin on behalf: no time limit. Executor: 1-hour window only.
+        if (!$isAdminOnBehalf) {
+            $minsElapsed = (int) $log->created_at->diffInMinutes(now());
+            if ($minsElapsed > 60) {
+                return back()->withErrors(['general' => '1 saatlıq düzəliş müddəti bitib. Statusu geri almaq mümkün deyil.']);
+            }
         }
 
         $this->deleteStatusLog($log);
