@@ -255,7 +255,7 @@
 @section('content')
     <div class="page-header">
         <h2><i class="bi bi-file-text me-2"></i>Hüquqi Aktlar</h2>
-        @if($canManage || $canAssign)
+        @if($canAssign && !$isAdmin)
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
                 <i class="bi bi-plus-circle me-1"></i> Yeni əlavə et
             </button>

@@ -94,11 +94,11 @@ class User extends Authenticatable
 
     /**
      * Check if user may create legal acts.
-     * Only admin, or managers whose department (or ancestor) has can_assign=true.
+     * Only managers whose department (or ancestor) has can_assign=true. Admin is excluded.
      */
     public function canCreateLegalActs(): bool
     {
-        return $this->isAdmin() || ($this->user_role === 'manager' && $this->canAssignDeptId() !== null);
+        return $this->user_role === 'manager' && $this->canAssignDeptId() !== null;
     }
 
     /**
