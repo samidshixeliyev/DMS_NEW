@@ -367,8 +367,19 @@ class LegalActController extends Controller
             $assignDeptId = $user->canAssignDeptId();
             if ($assignDeptId) {
                 $allowedOrgIds = Department::descendantIdsOf($assignDeptId);
-                if (!in_array((int) $legalAct->organization_id, $allowedOrgIds)) {
-                    abort(403);
+                $orgInScope    = in_array((int) $legalAct->organization_id, $allowedOrgIds);
+
+                if (!$orgInScope) {
+                    // Also allow tasks from ancestor orgs that have executors in this manager's own subtree
+                    // (mirrors the second condition in applyVisibilityScope)
+                    $ancestorIds       = Department::find($assignDeptId)?->ancestorIds() ?? [];
+                    $ownSubtreeDeptIds = Department::descendantIdsOf($user->department_id ?? $assignDeptId);
+                    $isAncestorOrg     = in_array((int) $legalAct->organization_id, $ancestorIds);
+                    $hasExecutorHere   = $legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists();
+
+                    if (!$isAncestorOrg || !$hasExecutorHere) {
+                        abort(403);
+                    }
                 }
             }
             // Manager without any can_assign ancestry: may view all acts
