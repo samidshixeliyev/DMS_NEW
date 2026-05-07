@@ -49,7 +49,18 @@ class ExecutorDashboardController extends Controller
             $allExecutors = collect();
         }
 
-        return view('executor.index', compact('executionNotes', 'allExecutors'));
+        // Build org tabs: the canAssignDeptId org + all its ancestors (orgs that can assign tasks to this user)
+        // Ordered ancestors-first so the highest org appears as the first tab.
+        $visibleOrgs = collect();
+        if ($assignDeptId = $user->canAssignDeptId()) {
+            $own         = Department::find($assignDeptId);
+            $ancestorIds = $own?->ancestorIds() ?? [];
+            $allIds      = array_merge($ancestorIds, [$assignDeptId]);
+            $orgs        = Department::whereIn('id', $allIds)->get()->keyBy('id');
+            $visibleOrgs = collect($allIds)->map(fn($id) => $orgs->get($id))->filter();
+        }
+
+        return view('executor.index', compact('executionNotes', 'allExecutors', 'visibleOrgs'));
     }
 
     public function load(Request $request)
@@ -73,9 +84,14 @@ class ExecutorDashboardController extends Controller
         $start  = $request->input('start', 0);
         $length = $request->input('length', 25);
 
+        $orgId = $request->filled('organization_id') ? (int) $request->input('organization_id') : null;
+
         $baseQuery = LegalAct::active();
         if (!empty($visibleExecutorIds)) {
             $baseQuery->whereHas('executors', fn($q) => $q->whereIn('executors.id', $visibleExecutorIds));
+        }
+        if ($orgId) {
+            $baseQuery->where('organization_id', $orgId);
         }
         $totalRecords = (clone $baseQuery)->count();
 
@@ -89,6 +105,9 @@ class ExecutorDashboardController extends Controller
 
         if (!empty($visibleExecutorIds)) {
             $query->whereHas('executors', fn($q) => $q->whereIn('executors.id', $visibleExecutorIds));
+        }
+        if ($orgId) {
+            $query->where('organization_id', $orgId);
         }
         if ($request->filled('col.legal_act_number')) {
             foreach (preg_split('/\s+/', trim($request->input('col.legal_act_number'))) as $term) {

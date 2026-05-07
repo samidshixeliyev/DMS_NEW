@@ -209,6 +209,20 @@
         </div>
     @endif
 
+    {{-- Org source tabs — only shown when there are 2+ potential assigning orgs --}}
+    @if($visibleOrgs->count() > 1)
+    <div class="mb-3 d-flex align-items-center gap-2 flex-wrap" id="orgTabBar">
+        <span class="text-muted fw-semibold" style="font-size:0.82rem"><i class="bi bi-building me-1"></i>Tapşırıq verən:</span>
+        @foreach($visibleOrgs as $org)
+        <button type="button"
+            class="btn btn-sm {{ $loop->first ? 'btn-primary' : 'btn-outline-primary' }} org-tab{{ $loop->first ? ' active' : '' }}"
+            data-org-id="{{ $org->id }}">
+            {{ $org->name }}
+        </button>
+        @endforeach
+    </div>
+    @endif
+
     <div class="card">
         <div class="card-body p-0">
             <div style="overflow-x:auto;">
@@ -315,10 +329,25 @@
 
             $('#viewAsExecutor').select2({ theme: 'bootstrap-5', placeholder: 'İcraçı seçin...', allowClear: true, width: '100%' });
             $('#viewAsExecutor').on('change', function () { table.ajax.reload(); });
+
+            // ─── Org tab state ───────────────────────────────────────────
+            @if($visibleOrgs->count() > 1)
+            window._activeOrgId = {{ $visibleOrgs->first()->id }};
+            @else
+            window._activeOrgId = null;
+            @endif
+
             // ─── DataTable ──────────────────────────────────────────────
             var table = $('#executorTable').DataTable({
                 processing: true, serverSide: true,
-                ajax: { url: "{{ route('executor.load') }}", type: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken }, data: function (d) { var ex = $('#viewAsExecutor').val(); if (ex) d.view_as_executor_id = ex; } },
+                ajax: {
+                    url: "{{ route('executor.load') }}", type: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken },
+                    data: function (d) {
+                        var ex = $('#viewAsExecutor').val();
+                        if (ex) d.view_as_executor_id = ex;
+                        if (window._activeOrgId) d.organization_id = window._activeOrgId;
+                    }
+                },
                 columns: [
                     { data: 'rowNum', className: 'text-center', orderable: false },
                     { data: 'actType', className: 'text-center', render: function (d) { return (!d || d === '-') ? '-' : '<span class="badge" style="background:var(--accent-dark,#1e3a5f)">' + escapeHtml(d) + '</span>'; } },
@@ -359,6 +388,14 @@
                     zeroRecords: "Tapılmadı",
                     search: "Axtar:"
                 }
+            });
+
+            // ─── Org tab switching ───────────────────────────────────────
+            $('#orgTabBar').on('click', '.org-tab', function () {
+                $('#orgTabBar .org-tab').removeClass('active btn-primary').addClass('btn-outline-primary');
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary active');
+                window._activeOrgId = $(this).data('org-id') || null;
+                table.ajax.reload();
             });
 
             // ─── Attachment warning toggle ──────────────────────────────
