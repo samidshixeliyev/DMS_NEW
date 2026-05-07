@@ -304,16 +304,6 @@ class ExecutorDashboardController extends Controller
             }
         }
 
-        if ($requiresAllExecutors) {
-            $existingPartial = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-                ->where('user_id', $user->id)
-                ->where('approval_status', 'partial')
-                ->first();
-            if ($existingPartial) {
-                return back()->withErrors(['general' => 'Siz artıq status göndərmisiniz. Digər icraçıların cavabı gözlənilir.']);
-            }
-        }
-
         if ($isIcraOlunub && $legalAct->proof_required) {
             $hasValidFiles = false;
             if ($request->hasFile('attachments')) {
@@ -340,41 +330,9 @@ class ExecutorDashboardController extends Controller
             }
         }
 
-        $approvalStatus = null;
-        if ($requiresAllExecutors) {
-            $allAssignedExecutorIds = $legalAct->executors()->pluck('executors.id')->toArray();
-            $totalExecutors = count($allAssignedExecutorIds);
-
-            if ($totalExecutors > 1) {
-                $otherPartials = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-                    ->where('user_id', '!=', $user->id)
-                    ->where('approval_status', 'partial')
-                    ->with('user')
-                    ->get();
-
-                $submittedExecutorIds = $otherPartials
-                    ->map(fn($log) => $log->user?->executor_id)
-                    ->filter()
-                    ->unique()
-                    ->values()
-                    ->toArray();
-
-                $currentExecutorId = $user->executor_id;
-                $allSubmitted = array_unique(array_merge($submittedExecutorIds, $currentExecutorId ? [$currentExecutorId] : []));
-                $submittedCount = count($allSubmitted);
-
-                if ($submittedCount >= $totalExecutors) {
-                    $approvalStatus = 'pending';
-                    ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-                        ->where('approval_status', 'partial')
-                        ->update(['approval_status' => 'pending']);
-                } else {
-                    $approvalStatus = 'partial';
-                }
-            } else {
-                $approvalStatus = $isIcraOlunub ? 'pending' : null;
-            }
-        }
+        // Each executor's "icra olunub" submission goes immediately to pending review —
+        // no waiting for other executors on the same document.
+        $approvalStatus = $isIcraOlunub ? 'pending' : null;
 
         $statusLog = ExecutorStatusLog::create([
             'legal_act_id'      => $legalAct->id,
@@ -400,13 +358,9 @@ class ExecutorDashboardController extends Controller
             }
         }
 
-        $successMsg = 'Status uğurla yeniləndi.';
-        if ($requiresAllExecutors && $approvalStatus === 'partial') {
-            $remaining  = $this->getRemainingExecutorCount($legalAct, $user->id);
-            $successMsg = 'Status göndərildi. Daha ' . $remaining . ' icraçının cavabı gözlənilir.';
-        } elseif ($requiresAllExecutors && $approvalStatus === 'pending') {
-            $successMsg = 'Bütün icraçılar status göndərdi. Admin/menecer təsdiqi gözlənilir.';
-        }
+        $successMsg = $approvalStatus === 'pending'
+            ? 'İcra statusu göndərildi. Admin/menecer təsdiqi gözlənilir.'
+            : 'Status uğurla yeniləndi.';
 
         return redirect()->route('executor.index')->with('success', $successMsg);
     }
@@ -495,16 +449,6 @@ class ExecutorDashboardController extends Controller
         }
 
         return [];
-    }
-
-    private function getRemainingExecutorCount(LegalAct $legalAct, int $currentUserId): int
-    {
-        $total     = $legalAct->executors()->count();
-        $submitted = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
-            ->whereIn('approval_status', ['partial', 'pending'])
-            ->distinct('user_id')
-            ->count('user_id');
-        return max(0, $total - $submitted);
     }
 
     private function getAttachmentPath(ExecutionAttachment $attachment): string

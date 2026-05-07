@@ -20,27 +20,13 @@ class ApprovalController extends Controller
 
     private function getSubmittedByHtml(ExecutorStatusLog $log): string
     {
-        $allPendingLogs = ExecutorStatusLog::where('legal_act_id', $log->legal_act_id)
-            ->where('approval_status', 'pending')
-            ->with(['user', 'executionNote'])
-            ->get();
+        $executorId = $log->user?->executor_id;
+        $executors  = $log->legalAct->executors->keyBy('id');
+        $role       = $executorId ? $executors->get($executorId)?->pivot?->role : null;
+        $roleLabel  = match ($role) { 'main' => 'Əsas', 'helper' => 'Digər', default => '' };
 
-        if ($allPendingLogs->count() <= 1) {
-            return e($log->user->name ?? '-');
-        }
-
-        // Use already-eager-loaded executors from the relation instead of a fresh DB query
-        $executors = $log->legalAct->executors->keyBy('id');
-
-        $html = '';
-        foreach ($allPendingLogs as $pLog) {
-            $executorId = $pLog->user?->executor_id;
-            $role       = $executorId ? $executors->get($executorId)?->pivot?->role : null;
-            $roleLabel  = $role === 'main' ? 'Əsas' : 'Digər';
-            $html .= '<div><strong>' . e($roleLabel) . ':</strong> ' . e($pLog->user->name ?? '-')
-                . ' <small class="text-muted">(' . e($pLog->executionNote->note ?? '') . ')</small></div>';
-        }
-        return $html;
+        $name = e($log->user?->name ?? '-');
+        return $roleLabel ? '<strong>' . $roleLabel . ':</strong> ' . $name : $name;
     }
 
     public function index()
