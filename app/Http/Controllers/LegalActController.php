@@ -125,6 +125,15 @@ class LegalActController extends Controller
         $canAssign = $user->canAssignTasks();
         $isAdmin  = $user->isAdmin();
 
+        // Pre-compute editable org IDs so canEdit is accurate per-row (mirrors edit() auth logic).
+        // null = unrestricted (admin/manager with no can_assign ancestry).
+        // array = only acts whose organization_id is in this set are editable.
+        $editableOrgIds = null;
+        if ($canManage && !$isAdmin) {
+            $assignDeptId = $user->canAssignDeptId();
+            $editableOrgIds = $assignDeptId ? Department::descendantIdsOf($assignDeptId) : [];
+        }
+
         $data = [];
         foreach ($results as $i => $act) {
             $mainExecutors   = $act->executors->where('pivot.role', 'main')->values();
@@ -265,7 +274,10 @@ class LegalActController extends Controller
                     : '-',
                 'organizationId'   => $act->organization_id,
                 'organizationName' => $act->organization?->name ?? '-',
-                'canEdit'          => ($userId === $act->inserted_user_id) || $canManage,
+                'canEdit'          => $isAdmin
+                    || ($canManage && $editableOrgIds === null)
+                    || ($canManage && $editableOrgIds !== null && in_array((int) $act->organization_id, $editableOrgIds))
+                    || (!$canManage && $userId === $act->inserted_user_id),
                 'canDelete'        => $isAdmin,
                 'hasPendingApproval' => $anyPending,
                 'pendingLogId'     => $pendingLogId,
