@@ -328,7 +328,7 @@ class ExecutorDashboardController extends Controller
 
         if ($myLatestIcraLog) {
             if ($myLatestIcraLog->approval_status === 'approved') {
-                return back()->withErrors(['general' => 'Sizin icranız artıq təsdiqlənib.']);
+                return back()->withErrors(['general' => 'Bu sənəd menecer tərəfindən artıq təsdiqlənib. Yeni status göndərmək mümkün deyil.']);
             }
             if (in_array($myLatestIcraLog->approval_status, ['pending', 'partial'])) {
                 $minsElapsed = (int) $myLatestIcraLog->created_at->diffInMinutes(now());
@@ -409,6 +409,17 @@ class ExecutorDashboardController extends Controller
 
         if (!$user->executor_id) {
             abort(403, 'Yalnız icraçılar status geri ala bilər.');
+        }
+
+        // Check first if this user's icra-olunub log was already approved by a manager
+        $approvedLog = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
+            ->where('user_id', $user->id)
+            ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
+            ->where('approval_status', 'approved')
+            ->exists();
+
+        if ($approvedLog) {
+            return back()->withErrors(['general' => 'Bu sənəd menecer tərəfindən artıq təsdiqlənib. Geri almaq mümkün deyil.']);
         }
 
         $log = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
