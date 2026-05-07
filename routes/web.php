@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
         Route::post('executor/dashboard/load', [ExecutorDashboardController::class, 'load'])->name('executor.load');
         Route::get('executor/legal-acts/{legalAct}', [ExecutorDashboardController::class, 'show'])->name('executor.show');
         Route::post('executor/legal-acts/{legalAct}/status', [ExecutorDashboardController::class, 'storeStatus'])->name('executor.store-status');
+        Route::post('executor/legal-acts/{legalAct}/withdraw-status', [ExecutorDashboardController::class, 'withdrawStatus'])->name('executor.withdraw-status');
         Route::get('executor/attachments/{attachment}/download', [ExecutorDashboardController::class, 'downloadAttachment'])->name('executor.download-attachment');
         Route::get('executor/attachments/{attachment}/preview', [ExecutorDashboardController::class, 'previewAttachment'])->name('executor.preview-attachment');
     });

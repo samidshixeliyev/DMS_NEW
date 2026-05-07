@@ -607,8 +607,6 @@ class LegalActController extends Controller
         $user = auth()->user();
         if (!$user->isAdmin())
             abort(403, 'Yalnız admin silə bilər.');
-        if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id)
-            abort(403, 'Bu hüquqi akt sizin idarənizə aid deyil.');
         $legalAct->update(['is_deleted' => true]);
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla silindi.');
     }
@@ -635,8 +633,6 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
         if (!$user->canManage())
-            abort(403);
-        if ($user->department?->can_assign && $legalAct->organization_id !== $user->department_id)
             abort(403);
 
         $legalAct->update(['proof_required' => !$legalAct->proof_required]);

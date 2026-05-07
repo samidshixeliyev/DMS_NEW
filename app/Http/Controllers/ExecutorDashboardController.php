@@ -8,6 +8,7 @@ use App\Models\ExecutionAttachment;
 use App\Models\ExecutionNote;
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ExecutorDashboardController extends Controller
@@ -198,21 +199,32 @@ class ExecutorDashboardController extends Controller
             // canChangeStatus only applies when the user is acting as their own executor
             $isOwnExecutor = $primaryExecutorId && $primaryExecutorId === $user->executor_id;
 
+            // 1-hour grace period: executor can withdraw their pending icra-olunub submission
+            $graceMinsLeft = null;
+            $canWithdraw   = false;
+            if ($myIsPending && $isOwnExecutor && $myLatestLog) {
+                $minsElapsed   = (int) $myLatestLog->created_at->diffInMinutes(now());
+                $graceMinsLeft = max(0, 60 - $minsElapsed);
+                $canWithdraw   = $graceMinsLeft > 0;
+            }
+
             $data[] = [
-                'DT_RowClass'    => $rowClass,
-                'id'             => $act->id,
-                'rowNum'         => $start + $i + 1,
-                'actType'        => $act->actType?->name ?? '-',
-                'legalActNumber' => $act->legal_act_number ?? '-',
-                'legalActDate'   => $act->legal_act_date?->format('d.m.Y') ?? '-',
-                'issuingAuthority' => $act->issuingAuthority?->name ?? '-',
-                'summary'        => Str::limit($act->summary, 80) ?? '-',
-                'taskNumber'     => $act->task_number ?? '-',
-                'deadlineHtml'   => $deadlineHtml,
-                'statusHtml'     => $statusHtml,
-                'roleHtml'       => $roleHtml,
-                'proofRequired'  => (bool) $act->proof_required,
+                'DT_RowClass'     => $rowClass,
+                'id'              => $act->id,
+                'rowNum'          => $start + $i + 1,
+                'actType'         => $act->actType?->name ?? '-',
+                'legalActNumber'  => $act->legal_act_number ?? '-',
+                'legalActDate'    => $act->legal_act_date?->format('d.m.Y') ?? '-',
+                'issuingAuthority'=> $act->issuingAuthority?->name ?? '-',
+                'summary'         => Str::limit($act->summary, 80) ?? '-',
+                'taskNumber'      => $act->task_number ?? '-',
+                'deadlineHtml'    => $deadlineHtml,
+                'statusHtml'      => $statusHtml,
+                'roleHtml'        => $roleHtml,
+                'proofRequired'   => (bool) $act->proof_required,
                 'canChangeStatus' => !$myIsExecuted && !$myIsPending && $isOwnExecutor,
+                'canWithdraw'     => $canWithdraw,
+                'graceMinsLeft'   => $graceMinsLeft,
             ];
         }
 
@@ -319,7 +331,13 @@ class ExecutorDashboardController extends Controller
                 return back()->withErrors(['general' => 'Sizin icranız artıq təsdiqlənib.']);
             }
             if (in_array($myLatestIcraLog->approval_status, ['pending', 'partial'])) {
-                return back()->withErrors(['general' => 'Sizin təsdiq gözləyən icra qeydiniz var.']);
+                $minsElapsed = (int) $myLatestIcraLog->created_at->diffInMinutes(now());
+                if ($minsElapsed <= 60) {
+                    // Within 1-hour grace period: remove the previous submission so this one replaces it
+                    $this->deleteStatusLog($myLatestIcraLog);
+                } else {
+                    return back()->withErrors(['general' => 'Sizin təsdiq gözləyən icra qeydiniz var.']);
+                }
             }
         }
 
@@ -384,6 +402,36 @@ class ExecutorDashboardController extends Controller
         return redirect()->route('executor.index')->with('success', $successMsg);
     }
 
+    public function withdrawStatus(LegalAct $legalAct)
+    {
+        $user = auth()->user();
+        $this->authorizeAccess($legalAct, $user);
+
+        if (!$user->executor_id) {
+            abort(403, 'Yalnız icraçılar status geri ala bilər.');
+        }
+
+        $log = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
+            ->where('user_id', $user->id)
+            ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
+            ->where('approval_status', 'pending')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$log) {
+            return back()->withErrors(['general' => 'Geri alınacaq icra qeydi tapılmadı.']);
+        }
+
+        $minsElapsed = (int) $log->created_at->diffInMinutes(now());
+        if ($minsElapsed > 60) {
+            return back()->withErrors(['general' => '1 saatlıq düzəliş müddəti bitib. Statusu geri almaq mümkün deyil.']);
+        }
+
+        $this->deleteStatusLog($log);
+
+        return redirect()->route('executor.index')->with('success', 'İcra statusu uğurla geri alındı. İndi yenidən status göndərə bilərsiniz.');
+    }
+
     public function downloadAttachment(ExecutionAttachment $attachment)
     {
         $this->authorizeAttachmentAccess($attachment);
@@ -422,6 +470,21 @@ class ExecutorDashboardController extends Controller
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private function deleteStatusLog(ExecutorStatusLog $log): void
+    {
+        $log->load('attachments');
+        foreach ($log->attachments as $attachment) {
+            foreach ([
+                storage_path('app/private/' . $attachment->file_path),
+                storage_path('app/' . $attachment->file_path),
+            ] as $path) {
+                if (file_exists($path)) @unlink($path);
+            }
+            $attachment->delete();
+        }
+        $log->delete();
+    }
 
     /**
      * Resolve which executor IDs this user may see tasks for.

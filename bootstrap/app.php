@@ -16,5 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Redirect to login with a clear message whenever a CSRF token mismatch
+        // occurs (419 Page Expired). This covers stale logout forms and stale
+        // login forms after a long idle session.
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            return redirect()->route('login')
+                ->withErrors(['session' => 'Sessiyanız başa çatdı. Zəhmət olmasa yenidən daxil olun.']);
+        });
     })->create();

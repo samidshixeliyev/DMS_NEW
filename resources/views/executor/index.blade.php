@@ -307,6 +307,31 @@
         </div>
     </div>
 
+    {{-- Withdraw Status Modal --}}
+    <div class="modal fade" id="withdrawModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="withdrawForm" method="POST">@csrf
+                    <div class="modal-header" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;">
+                        <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>İcra Statusunu Geri Al</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Bu sənəd üçün göndərdiyiniz <strong>"İcra olunub"</strong> statusunu geri almaq istəyirsiniz?</p>
+                        <p class="text-muted" id="withdrawTimeNote" style="font-size:0.85rem;"></p>
+                        <div class="alert alert-warning py-2" style="font-size:0.85rem;">
+                            <i class="bi bi-info-circle me-1"></i> Geri aldıqdan sonra sənəd yenidən aktiv olacaq və siz yeni status göndərə biləcəksiniz.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İmtina</button>
+                        <button type="submit" class="btn btn-warning text-white"><i class="bi bi-arrow-counterclockwise me-1"></i> Geri Al</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     {{-- Preview Modal (shared partial) --}}
     @include('partials.preview-modal')
 
@@ -364,7 +389,9 @@
                             var btns = '<div class="action-btns">';
                             btns += '<button class="btn btn-sm btn-info" title="Bax" onclick="showDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>';
                             if (d.canChangeStatus) {
-                                btns += '<button class="btn btn-sm btn-warning" title="Status" onclick="changeStatus(' + d.id + ')"><i class="bi bi-pencil-square"></i></button>';
+                                btns += '<button class="btn btn-sm btn-warning" title="Status dəyiş" onclick="changeStatus(' + d.id + ')"><i class="bi bi-pencil-square"></i></button>';
+                            } else if (d.canWithdraw) {
+                                btns += '<button class="btn btn-sm btn-outline-warning" title="Geri al (' + d.graceMinsLeft + ' dəq. qalıb)" onclick="withdrawStatus(' + d.id + ',' + d.graceMinsLeft + ')"><i class="bi bi-arrow-counterclockwise"></i></button>';
                             } else {
                                 btns += '<button class="btn btn-sm btn-secondary" disabled title="Dəyişiklik mümkün deyil"><i class="bi bi-lock"></i></button>';
                             }
@@ -556,6 +583,16 @@
             document.querySelector('#statusForm textarea[name="custom_note"]').value = '';
             if (window._resetStatusFiles) window._resetStatusFiles();
             new bootstrap.Modal(document.getElementById('statusModal')).show();
+        }
+
+        // ─── Withdraw status (1-hour grace period) ──────────────────────
+        function withdrawStatus(id, minsLeft) {
+            document.getElementById('withdrawForm').action = '/executor/legal-acts/' + id + '/withdraw-status';
+            var note = document.getElementById('withdrawTimeNote');
+            note.textContent = minsLeft > 1
+                ? 'Düzəliş müddəti: ' + minsLeft + ' dəqiqə qalıb.'
+                : 'Düzəliş müddəti tükənmək üzrədir (1 dəqiqə).';
+            new bootstrap.Modal(document.getElementById('withdrawModal')).show();
         }
     </script>
 @endpush
