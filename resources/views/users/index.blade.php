@@ -134,6 +134,7 @@
                                         <option value="{{ $dept->id }}" {{ old('department_id') == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
                                     @endforeach
                                 </select>
+                                <div id="create_dept_head_warning" class="mt-1" style="display:none;"></div>
                             </div>
                         </div>
                     </div>
@@ -210,6 +211,7 @@
                                 <select name="department_id" id="edit_department_id" class="form-select">
                                     <option value="">Seç</option>
                                 </select>
+                                <div id="edit_dept_head_warning" class="mt-1" style="display:none;"></div>
                             </div>
                         </div>
                     </div>
@@ -334,10 +336,48 @@
             document.getElementById('createModal').addEventListener('hidden.bs.modal', function () {
                 document.getElementById('create_username_feedback').textContent = '';
                 document.getElementById('create_username').classList.remove('is-invalid');
+                document.getElementById('create_dept_head_warning').style.display = 'none';
             });
             document.getElementById('editModal').addEventListener('hidden.bs.modal', function () {
                 document.getElementById('edit_username_feedback').textContent = '';
                 document.getElementById('edit_username').classList.remove('is-invalid');
+                document.getElementById('edit_dept_head_warning').style.display = 'none';
+            });
+
+            // Department head check — live AJAX warning
+            function checkDeptHead(prefix, excludeId) {
+                var role = document.getElementById(prefix + '_user_role').value;
+                var deptId = document.getElementById(prefix + '_department_id').value;
+                var warn = document.getElementById(prefix + '_dept_head_warning');
+                if (role !== 'manager' || !deptId) { warn.style.display = 'none'; return; }
+                var url = '{{ route('users.check-department-head') }}?department_id=' + encodeURIComponent(deptId)
+                    + (excludeId ? '&exclude_id=' + excludeId : '');
+                fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+                    if (d.exists) {
+                        warn.innerHTML = '<div class="alert alert-warning py-1 px-2 mb-0" style="font-size:0.82rem">'
+                            + '<i class="bi bi-exclamation-triangle-fill me-1"></i>'
+                            + 'Bu şöbənin artıq aktiv rəhbəri var: <strong>' + escapeHtml(d.name) + '</strong>. '
+                            + 'Saxladıqda əməliyyat bloklanacaq.</div>';
+                        warn.style.display = 'block';
+                    } else {
+                        warn.style.display = 'none';
+                    }
+                });
+            }
+
+            $(document).on('change', '#create_department_id', function () {
+                checkDeptHead('create', null);
+            });
+            $(document).on('change', '#create_user_role', function () {
+                checkDeptHead('create', null);
+            });
+            $(document).on('change', '#edit_department_id', function () {
+                var excludeId = (document.getElementById('editForm').action.match(/\/users\/(\d+)$/) || [])[1];
+                checkDeptHead('edit', excludeId);
+            });
+            $(document).on('change', '#edit_user_role', function () {
+                var excludeId = (document.getElementById('editForm').action.match(/\/users\/(\d+)$/) || [])[1];
+                checkDeptHead('edit', excludeId);
             });
 
             $(document).on('change', 'select[name="executor_id"]', function () {
@@ -481,7 +521,11 @@
             }
         }
 
-        @if($errors->any() && old('_token'))
+        @if($errors->any() && session('edit_user_id'))
+            document.addEventListener('DOMContentLoaded', function () {
+                editRecord({{ session('edit_user_id') }});
+            });
+        @elseif($errors->any() && old('_token'))
             document.addEventListener('DOMContentLoaded', function () {
                 new bootstrap.Modal(document.getElementById('createModal')).show();
             });

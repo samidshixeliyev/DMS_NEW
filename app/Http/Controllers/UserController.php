@@ -76,6 +76,31 @@ class UserController extends Controller
         return response()->json(['exists' => $query->exists()]);
     }
 
+    public function checkDepartmentHead(Request $request)
+    {
+        $departmentId = $request->input('department_id');
+        $excludeId    = $request->input('exclude_id');
+
+        if (!$departmentId) {
+            return response()->json(['exists' => false, 'name' => null]);
+        }
+
+        $query = User::where('user_role', 'manager')
+            ->where('department_id', (int) $departmentId)
+            ->where('is_deleted', false);
+
+        if ($excludeId) {
+            $query->where('id', '!=', (int) $excludeId);
+        }
+
+        $existing = $query->first();
+
+        return response()->json([
+            'exists' => (bool) $existing,
+            'name'   => $existing ? $existing->name . ' ' . $existing->surname : null,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -97,6 +122,18 @@ class UserController extends Controller
         // executor_id is only meaningful for executor and manager roles
         if (!in_array($validated['user_role'], ['executor', 'manager'])) {
             $validated['executor_id'] = null;
+        }
+
+        if ($validated['user_role'] === 'manager' && !empty($validated['department_id'])) {
+            $existing = User::where('user_role', 'manager')
+                ->where('department_id', (int) $validated['department_id'])
+                ->where('is_deleted', false)
+                ->first();
+            if ($existing) {
+                return back()->withInput()->withErrors([
+                    'department_id' => "Bu şöbənin artıq aktiv rəhbəri var: {$existing->name} {$existing->surname}. Əvvəlcə mövcud rəhbəri başqa şöbəyə köçürün.",
+                ]);
+            }
         }
 
         User::create($validated);
@@ -161,6 +198,19 @@ class UserController extends Controller
         // executor_id is only meaningful for executor and manager roles
         if (!in_array($validated['user_role'], ['executor', 'manager'])) {
             $validated['executor_id'] = null;
+        }
+
+        if ($validated['user_role'] === 'manager' && !empty($validated['department_id'])) {
+            $existing = User::where('user_role', 'manager')
+                ->where('department_id', (int) $validated['department_id'])
+                ->where('is_deleted', false)
+                ->where('id', '!=', $user->id)
+                ->first();
+            if ($existing) {
+                return back()->withInput()->withErrors([
+                    'department_id' => "Bu şöbənin artıq aktiv rəhbəri var: {$existing->name} {$existing->surname}. Əvvəlcə mövcud rəhbəri başqa şöbəyə köçürün.",
+                ])->with('edit_user_id', $user->id);
+            }
         }
 
         $user->update($validated);

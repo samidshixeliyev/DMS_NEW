@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function () {
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::post('users/load', [UserController::class, 'load'])->name('users.load');
         Route::get('users/check-username', [UserController::class, 'checkUsername'])->name('users.check-username');
+        Route::get('users/check-department-head', [UserController::class, 'checkDepartmentHead'])->name('users.check-department-head');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::get('users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
