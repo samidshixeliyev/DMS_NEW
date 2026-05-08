@@ -99,6 +99,12 @@ class LegalActController extends Controller
         $this->applyVisibilityScope($totalQuery, $user);
         if ($request->filled('col.organization_id')) {
             $totalQuery->where('organization_id', (int) $request->input('col.organization_id'));
+        } else {
+            // No tab selected: restrict total count to same default org set as the data query.
+            $defaultOrgs = $this->defaultOrgIds();
+            if ($defaultOrgs !== null) {
+                $totalQuery->whereIn('organization_id', $defaultOrgs);
+            }
         }
         $totalRecords = (clone $totalQuery)->count();
 
@@ -825,6 +831,22 @@ class LegalActController extends Controller
         return false;
     }
 
+    /**
+     * Return the organisation IDs the current user may see by default (no tab selected).
+     * Rule: own department + all ancestors (same set as the org-filter tab buttons).
+     * Returns null for admins (unrestricted).
+     */
+    private function defaultOrgIds(): ?array
+    {
+        $user = auth()->user();
+        if ($user->isAdmin()) return null;
+        if (!$user->department_id) return [];
+
+        $ownDeptId   = (int) $user->department_id;
+        $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
+        return array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+    }
+
     private function applyFilters(Request $request)
     {
         $query = LegalAct::with([
@@ -840,6 +862,15 @@ class LegalActController extends Controller
         ])->active();
 
         $this->applyVisibilityScope($query, auth()->user());
+
+        // When no org tab is selected, restrict to own dept + ancestors by default.
+        // This prevents the initial load from showing records from all accessible orgs.
+        if (!$request->filled('col.organization_id')) {
+            $defaultOrgs = $this->defaultOrgIds();
+            if ($defaultOrgs !== null) {
+                $query->whereIn('organization_id', $defaultOrgs);
+            }
+        }
 
         if ($request->filled('col.legal_act_number')) {
             foreach (preg_split('/\s+/', trim($request->input('col.legal_act_number'))) as $t) {
