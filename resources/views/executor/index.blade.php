@@ -382,7 +382,16 @@
                     { data: 'summary', className: 'wrap-cell' },
                     { data: 'taskNumber', className: 'text-center' },
                     { data: 'deadlineHtml', className: 'text-center' },
-                    { data: 'statusHtml', className: 'text-center' },
+                    {
+                        data: 'statusHtml', className: 'text-center',
+                        render: function (d, type, row) {
+                            var html = d;
+                            if (row.hasAttachments) {
+                                html += '<br><span class="badge mt-1" style="background:#0ea5e9;font-size:0.7rem"><i class="bi bi-paperclip me-1"></i>Sənəd əlavə edilib</span>';
+                            }
+                            return html;
+                        }
+                    },
                     { data: 'roleHtml', className: 'text-center' },
                     {
                         data: null, orderable: false, searchable: false, render: function (d) {

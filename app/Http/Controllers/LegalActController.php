@@ -64,11 +64,19 @@ class LegalActController extends Controller
             $ownDept     = Department::active()->find($ownDeptId);
             $ancestorIds = $ownDept?->ancestorIds() ?? [];
             $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            // Build a depth map so we can sort root-first (depth 0) → own dept last (deepest).
+            // ancestorIds() returns [immediate parent, grandparent, …, root], so reversing gives root first.
+            $depthMap = [];
+            foreach (array_reverse($ancestorIds) as $depth => $id) {
+                $depthMap[$id] = $depth;          // root = 0, next level = 1, …
+            }
+            $depthMap[$ownDeptId] = count($ancestorIds); // own dept is always the deepest
             $visibleOrgs = Department::active()
                 ->whereIn('id', $tabDeptIds)
                 ->where('can_assign', true)
-                ->orderBy('name')
-                ->get();
+                ->get()
+                ->sortBy(fn($dept) => $depthMap[$dept->id] ?? 999)
+                ->values();
         }
 
         return view('legal_acts.index', compact(

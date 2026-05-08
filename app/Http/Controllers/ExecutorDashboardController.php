@@ -59,11 +59,18 @@ class ExecutorDashboardController extends Controller
             $ownDept     = Department::active()->find($ownDeptId);
             $ancestorIds = $ownDept?->ancestorIds() ?? [];
             $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            // Depth map: root ancestor = depth 0, own dept = deepest. Sort tabs root-first.
+            $depthMap = [];
+            foreach (array_reverse($ancestorIds) as $depth => $id) {
+                $depthMap[$id] = $depth;
+            }
+            $depthMap[$ownDeptId] = count($ancestorIds);
             $visibleOrgs = Department::active()
                 ->whereIn('id', $tabDeptIds)
                 ->where('can_assign', true)
-                ->orderBy('name')
-                ->get();
+                ->get()
+                ->sortBy(fn($dept) => $depthMap[$dept->id] ?? 999)
+                ->values();
         }
 
         return view('executor.index', compact('executionNotes', 'allExecutors', 'visibleOrgs'));
@@ -195,6 +202,9 @@ class ExecutorDashboardController extends Controller
                     $statusHtml .= '<br><small class="text-muted">' . e(Str::limit($myLatestLog->custom_note, 30)) . '</small>';
             }
 
+            // Attachment indicator: true if any status log on this act has uploaded files.
+            $hasAttachments = $act->statusLogs->flatMap(fn($log) => $log->attachments)->isNotEmpty();
+
             // Role badge for primary executor
             $pivot    = $primaryExecutorId ? $act->executors->where('id', $primaryExecutorId)->first()?->pivot : null;
             $roleHtml = $pivot?->role === 'main'
@@ -239,6 +249,7 @@ class ExecutorDashboardController extends Controller
                 'graceMinsLeft'   => $graceMinsLeft,
                 'isAdminActingAs' => $isAdminActingAs,
                 'actingAsExecutorId' => $isAdminActingAs ? $executorId : null,
+                'hasAttachments'  => $hasAttachments,
             ];
         }
 
