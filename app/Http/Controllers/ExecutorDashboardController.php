@@ -265,9 +265,9 @@ class ExecutorDashboardController extends Controller
             'actType',
             'issuingAuthority',
             'executors.department',
-            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser'])->reorder('created_at', 'asc'),
+            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser.department'])->reorder('created_at', 'asc'),
             'attachments.user',
-            'insertedUser',
+            'insertedUser.department',
         ]);
 
         $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
@@ -306,7 +306,8 @@ class ExecutorDashboardController extends Controller
             'related_document_number' => $legalAct->related_document_number,
             'related_document_date'   => $legalAct->related_document_date?->format('d.m.Y'),
             'proof_required'      => (bool) $legalAct->proof_required,
-            'inserted_user'       => $legalAct->insertedUser?->full_name,
+            'inserted_user'            => $legalAct->insertedUser?->full_name,
+            'inserted_user_department' => $legalAct->insertedUser?->department?->name,
             'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
             'status_logs'         => $legalAct->statusLogs->map(fn($log) => [
                 'id'              => $log->id,
@@ -317,7 +318,8 @@ class ExecutorDashboardController extends Controller
                 'date'            => $log->created_at?->format('d.m.Y H:i'),
                 'approval_status' => $log->approval_status,
                 'approval_note'   => $log->approval_note,
-                'approved_by'     => $log->approvedByUser?->full_name,
+                'approved_by'            => $log->approvedByUser?->full_name,
+                'approved_by_department' => $log->approvedByUser?->department?->name,
                 'approved_at'     => $log->approved_at?->format('d.m.Y H:i'),
                 'attachments'     => $log->attachments->map(fn($att) => ['id' => $att->id, 'name' => $att->original_name, 'size' => round($att->file_size / 1024, 1) . ' KB', 'mime_type' => $att->mime_type]),
             ]),

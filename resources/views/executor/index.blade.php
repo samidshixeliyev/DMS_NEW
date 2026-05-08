@@ -555,7 +555,13 @@
                         logsHtml += '<div class="mt-1"><span class="badge ' + (map[log.approval_status] || 'bg-secondary') + '">' + (labels[log.approval_status] || log.approval_status) + '</span></div>';
                     }
                     if (log.approved_by) {
-                        logsHtml += '<div style="font-size:0.75rem" class="text-muted mt-1"><i class="bi bi-check2-circle me-1" style="color:#16a34a"></i>' + escapeHtml(log.approved_by) + ' · ' + escapeHtml(log.approved_at || '') + '</div>';
+                        var approverLabel = escapeHtml(log.approved_by);
+                        if (log.approved_by_department) {
+                            approverLabel += ' <span class="badge rounded-pill" style="background:#e0f2fe;color:#0369a1;font-size:0.62rem;font-weight:500;vertical-align:middle">'
+                                + '<i class="bi bi-building" style="font-size:0.6rem"></i> ' + escapeHtml(log.approved_by_department) + '</span>';
+                        }
+                        logsHtml += '<div style="font-size:0.75rem" class="text-muted mt-1"><i class="bi bi-check2-circle me-1" style="color:#16a34a"></i>'
+                            + approverLabel + ' · ' + escapeHtml(log.approved_at || '') + '</div>';
                     }
                     if (log.approval_note) {
                         logsHtml += '<div style="font-size:0.75rem" class="text-muted"><i class="bi bi-chat-left-text me-1"></i>' + escapeHtml(log.approval_note) + '</div>';
@@ -563,6 +569,10 @@
                     logsHtml += buildAttachmentHtml(log.attachments)
                         + '</div>';
                 });
+            }
+            var insertedUserHtml = escapeHtml(data.inserted_user || '-');
+            if (data.inserted_user_department) {
+                insertedUserHtml += '<br><small class="text-muted"><i class="bi bi-building me-1"></i>' + escapeHtml(data.inserted_user_department) + '</small>';
             }
             document.getElementById('showModalBody').innerHTML =
                 '<div class="row">'
@@ -574,8 +584,9 @@
                 + '<tr><th>Tarix</th><td>' + escapeHtml(data.legal_act_date || '-') + '</td></tr>'
                 + '<tr><th>Qısa məzmun</th><td style="white-space:pre-wrap">' + escapeHtml(data.summary || '-') + '</td></tr>'
                 + '<tr><th>Kim qəbul edib</th><td>' + escapeHtml(data.issuing_authority || '-') + '</td></tr>'
-                + '<tr><th>Əsas icraçı</th><td>' + (data.main_executors && data.main_executors.length ? data.main_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small>('+escapeHtml(e.department)+')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
-                + '<tr><th>Digər icraçı</th><td>' + (data.helper_executors && data.helper_executors.length ? data.helper_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small>('+escapeHtml(e.department)+')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
+                + '<tr><th>Daxil edən</th><td>' + insertedUserHtml + '</td></tr>'
+                + '<tr><th>Əsas icraçı</th><td>' + (data.main_executors && data.main_executors.length ? data.main_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small class="text-muted">(' + escapeHtml(e.department) + ')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
+                + '<tr><th>Digər icraçı</th><td>' + (data.helper_executors && data.helper_executors.length ? data.helper_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small class="text-muted">(' + escapeHtml(e.department) + ')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
                 + '<tr><th>Tapşırıq №</th><td>' + escapeHtml(data.task_number || '-') + '</td></tr>'
                 + '<tr><th>Tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_description || '-') + '</td></tr>'
                 + '<tr><th>İcra müddəti</th><td>' + escapeHtml(data.execution_deadline || '-') + '</td></tr>'
