@@ -41,15 +41,6 @@ class LegalActController extends Controller
             $executors = collect();
         }
 
-        // Visible organizations for the org tab filter
-        if ($user->isAdmin()) {
-            $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
-        } elseif ($user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
-            $visibleOrgs = Department::active()->where('id', $assignDeptId)->get();
-        } else {
-            $visibleOrgs = collect();
-        }
-
         $pendingApprovalCount = 0;
         if ($canManage) {
             $icraIds = ExecutionNote::active()->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))->pluck('id')->toArray();
@@ -62,18 +53,26 @@ class LegalActController extends Controller
             }
         }
 
-        // Organizations whose tasks this user can see — used to render org-filter tabs.
-        // Anchor on user's own dept: own dept (tasks it created) + every ancestor (tasks
-        // created by higher orgs that may have executors flowing into this dept's subtree).
+        // Org-filter tabs: strictly downward only — own dept + can_assign subordinates.
+        // Ancestor depts are intentionally excluded to prevent upward visibility leakage.
+        // (Tasks from ancestor orgs where own executors are assigned still appear in the
+        //  unfiltered "all acts" view via applyVisibilityScope, but have no dedicated tab.)
         $visibleOrgs = collect();
         if ($user->isAdmin()) {
             $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
         } elseif ($user->department_id && $user->canAssignDeptId()) {
-            $ownDeptId   = $user->department_id;
-            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
-            $allIds      = array_unique(array_merge([$ownDeptId], $ancestorIds));
-            $orgs        = Department::whereIn('id', $allIds)->get()->keyBy('id');
-            $visibleOrgs = collect($allIds)->map(fn($id) => $orgs->get($id))->filter();
+            $ownDeptId      = $user->department_id;
+            $subtreeIds     = Department::descendantIdsOf($ownDeptId);   // own + all children
+            $visibleOrgs    = Department::active()
+                ->whereIn('id', $subtreeIds)
+                ->where('can_assign', true)
+                ->orderBy('name')
+                ->get();
+            // Always include own dept even if it has can_assign=false
+            if ($visibleOrgs->doesntContain('id', $ownDeptId)) {
+                $own = Department::active()->find($ownDeptId);
+                if ($own) $visibleOrgs = $visibleOrgs->prepend($own);
+            }
         }
 
         return view('legal_acts.index', compact(
@@ -429,28 +428,58 @@ class LegalActController extends Controller
         $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
         $helperExecutors = $legalAct->executors->where('pivot.role', 'helper')->values();
 
-        // Build executor list with per-executor task_description
-        // Admin/manager sees all; dept users see the global task (private tasks stay private)
-        $viewerDeptIds = $user->canManage() ? null
-            : ($user->department_id ? Department::descendantIdsOf($user->department_id) : []);
-
-        $mapExecutor = function ($e) use ($user, $viewerDeptIds) {
-            $privateTask = null;
+        // Determine the set of department IDs this viewer may see executor data for.
+        // null = unrestricted (admin, or manager with no can_assign scope).
+        // array = restrict to own department subtree only (prevents cross-dept tab leakage).
+        $viewerSubtreeDeptIds = null;
+        if (!$user->isAdmin()) {
             if ($user->canManage()) {
-                // Managers see every executor's private task
-                $privateTask = $e->pivot->task_description;
-            } elseif ($viewerDeptIds && in_array($e->department_id, $viewerDeptIds)) {
-                // Dept user sees private task only for their own subtree's executors
-                $privateTask = $e->pivot->task_description;
+                $assignDeptId = $user->canAssignDeptId();
+                if ($assignDeptId) {
+                    $ownDeptId            = $user->department_id ?? $assignDeptId;
+                    $viewerSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);
+                }
+                // Manager with no can_assign ancestry: unrestricted (null)
+            } else {
+                // Regular user / executor role
+                if ($user->department_id) {
+                    $viewerSubtreeDeptIds = Department::descendantIdsOf($user->department_id);
+                }
             }
+        }
+
+        // Filter executor lists to only those in the viewer's department subtree.
+        // This prevents unrelated department executor tabs from appearing in the modal.
+        if ($viewerSubtreeDeptIds !== null) {
+            $mainExecutors   = $mainExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerSubtreeDeptIds))->values();
+            $helperExecutors = $helperExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerSubtreeDeptIds))->values();
+        }
+
+        // After filtering, all remaining executors are in scope — show their private task descriptions.
+        $mapExecutor = function ($e) {
             return [
-                'id'           => $e->id,
-                'name'         => $e->name,
-                'position'     => $e->position,
-                'department'   => $e->department?->name,
-                'task_description' => $privateTask,
+                'id'               => $e->id,
+                'name'             => $e->name,
+                'position'         => $e->position,
+                'department'       => $e->department?->name,
+                'task_description' => $e->pivot->task_description,
             ];
         };
+
+        // Collect the IDs of the (already-filtered) executors so we can scope status_logs too.
+        $allowedExecutorIds = $mainExecutors->pluck('id')
+            ->merge($helperExecutors->pluck('id'))
+            ->unique()
+            ->toArray();
+
+        // Filter status_logs: if viewer has a scope, only include logs whose executor is in scope.
+        // Logs without an executor_id (orphan logs) are included only for unrestricted viewers.
+        $filteredLogs = $viewerSubtreeDeptIds === null
+            ? $legalAct->statusLogs
+            : $legalAct->statusLogs->filter(
+                fn($log) => $log->user?->executor_id !== null
+                    && in_array($log->user->executor_id, $allowedExecutorIds)
+            );
 
         return response()->json([
             'id'                  => $legalAct->id,
@@ -470,7 +499,7 @@ class LegalActController extends Controller
             'inserted_user'       => $legalAct->insertedUser
                 ? $legalAct->insertedUser->name . ' ' . $legalAct->insertedUser->surname : null,
             'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
-            'status_logs'         => $legalAct->statusLogs->map(fn($log) => [
+            'status_logs'         => $filteredLogs->map(fn($log) => [
                 'user'            => $log->user?->full_name,
                 'executor_id'     => $log->user?->executor_id,
                 'note'            => $log->executionNote?->note,
