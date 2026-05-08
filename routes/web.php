@@ -32,6 +32,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:executor,admin,manager,user')->group(function () {
         Route::get('executor/dashboard', [ExecutorDashboardController::class, 'index'])->name('executor.index');
         Route::post('executor/dashboard/load', [ExecutorDashboardController::class, 'load'])->name('executor.load');
+        Route::get('executor/dashboard/org-counts', [ExecutorDashboardController::class, 'orgCounts'])->name('executor.org-counts');
         Route::get('executor/legal-acts/{legalAct}', [ExecutorDashboardController::class, 'show'])->name('executor.show');
         Route::post('executor/legal-acts/{legalAct}/status', [ExecutorDashboardController::class, 'storeStatus'])->name('executor.store-status');
         Route::post('executor/legal-acts/{legalAct}/withdraw-status', [ExecutorDashboardController::class, 'withdrawStatus'])->name('executor.withdraw-status');

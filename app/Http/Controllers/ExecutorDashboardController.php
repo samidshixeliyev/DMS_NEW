@@ -658,4 +658,78 @@ class ExecutorDashboardController extends Controller
 
         abort(403, 'Bu sənədə giriş icazəniz yoxdur.');
     }
+
+    /**
+     * Return the count of open (not yet approved-executed) legal acts per org tab.
+     * Used by the JS tab bar to render a badge like "MN KTB (3)".
+     *
+     * "Open" means: the act is active AND the executor user's visible executors have
+     * NOT yet received an approved "İcra olunub" status log for it.
+     */
+    public function orgCounts(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user       = auth()->user();
+        $executorId = $user->executor_id;
+
+        // Admin/manager viewing as specific executor
+        if ($user->canManage() && $request->filled('view_as_executor_id')) {
+            $executorId = (int) $request->input('view_as_executor_id');
+        }
+
+        $visibleExecutorIds = $this->resolveVisibleExecutorIds($user, $executorId);
+
+        // Build the set of org IDs this user can tab between
+        $visibleOrgs = collect();
+        if ($user->effectiveDeptId()) {
+            $ownDeptId   = $user->effectiveDeptId();
+            $ownDept     = Department::active()->find($ownDeptId);
+            $ancestorIds = $ownDept?->ancestorIds() ?? [];
+            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            $visibleOrgs = Department::active()
+                ->whereIn('id', $tabDeptIds)
+                ->where('can_assign', true)
+                ->pluck('id');
+        }
+
+        if ($visibleOrgs->isEmpty()) {
+            return response()->json([]);
+        }
+
+        $icraOlunubIds = $this->getIcraOlunubNoteIds();
+
+        $counts = [];
+        foreach ($visibleOrgs as $orgId) {
+            $query = LegalAct::active()->where('organization_id', $orgId);
+
+            if (!empty($visibleExecutorIds)) {
+                $query->whereHas('executors', fn($q) => $q->whereIn('executors.id', $visibleExecutorIds));
+            } elseif (!$user->isAdmin()) {
+                $counts[$orgId] = 0;
+                continue;
+            }
+
+            // "Open" = no approved "icra olunub" status log exists for any of the visible executors
+            if (!empty($visibleExecutorIds) && !empty($icraOlunubIds)) {
+                // Count acts that do NOT have an approved icra-olunub log for ALL visible executors
+                // Simpler definition: count acts where at least one visible executor is still open
+                $approvedActIds = \App\Models\ExecutorStatusLog::whereIn('execution_note_id', $icraOlunubIds)
+                    ->where('approval_status', 'approved')
+                    ->whereHas('legalAct', fn($q) => $q->where('organization_id', $orgId)->active())
+                    ->whereIn('user_id', function ($sub) use ($visibleExecutorIds) {
+                        $sub->select('id')->from('users')->whereIn('executor_id', $visibleExecutorIds)->where('is_deleted', false);
+                    })
+                    ->pluck('legal_act_id')
+                    ->unique()
+                    ->toArray();
+
+                if (!empty($approvedActIds)) {
+                    $query->whereNotIn('id', $approvedActIds);
+                }
+            }
+
+            $counts[$orgId] = $query->count();
+        }
+
+        return response()->json($counts);
+    }
 }

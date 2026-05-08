@@ -45,6 +45,7 @@
                             <th style="background:#1e3a5f;color:#fff;">Ad</th>
                             <th style="background:#1e3a5f;color:#fff;">Soyad</th>
                             <th style="background:#1e3a5f;color:#fff;">İstifadəçi adı</th>
+                            <th style="background:#1e3a5f;color:#fff;">E-poçt</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Rol</th>
                             <th style="background:#1e3a5f;color:#fff;">Rəhbər icraçı</th>
                             <th style="background:#1e3a5f;color:#fff;">Şöbə</th>
@@ -276,6 +277,10 @@
                     { data: 'name' },
                     { data: 'surname' },
                     { data: 'username', render: function (d) { return '<code>' + escapeHtml(d) + '</code>'; } },
+                    { data: 'email', render: function (d) {
+                        if (!d) return '<span class="text-muted">-</span>';
+                        return '<a href="mailto:' + escapeHtml(d) + '" class="text-decoration-none"><i class="bi bi-envelope me-1"></i>' + escapeHtml(d) + '</a>';
+                    } },
                     { data: 'user_role', className: 'text-center',
                       render: function (d) { return roleBadge[d] || escapeHtml(d); } },
                     { data: null, orderable: false, searchable: false,

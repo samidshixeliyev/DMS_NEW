@@ -393,6 +393,14 @@ class LegalActController extends Controller
             ]);
         }
 
+        $createDescription = sprintf(
+            'Hüquqi akt yaradıldı: %s №%s (%s)',
+            $legalAct->actType?->name ?? 'Naməlum növ',
+            $legalAct->legal_act_number,
+            $legalAct->legal_act_date?->format('d.m.Y') ?? '—'
+        );
+        ActivityLog::record(ActivityLog::ACTION_CREATE, $createDescription, 'LegalAct', $legalAct->id);
+
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla yaradıldı.');
     }
 

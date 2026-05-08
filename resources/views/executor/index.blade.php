@@ -429,6 +429,36 @@
                 }
             });
 
+            // ─── Org tab badge counts ────────────────────────────────────
+            @if($visibleOrgs->count() > 1)
+            function loadOrgCounts() {
+                var viewAs = $('#viewAsExecutor').val();
+                var url = "{{ route('executor.org-counts') }}" + (viewAs ? '?view_as_executor_id=' + encodeURIComponent(viewAs) : '');
+                fetch(url, { headers: { 'X-CSRF-TOKEN': csrfToken } })
+                    .then(function(r) { return r.json(); })
+                    .then(function(counts) {
+                        $('#orgTabBar .org-tab').each(function() {
+                            var orgId = $(this).data('org-id');
+                            var count = counts[orgId];
+                            var $badge = $(this).find('.org-count-badge');
+                            if (count > 0) {
+                                if ($badge.length) {
+                                    $badge.text(count);
+                                } else {
+                                    $(this).append(' <span class="org-count-badge badge rounded-pill" style="background:#ef4444;font-size:0.68rem;vertical-align:middle;pointer-events:none;">' + count + '</span>');
+                                }
+                            } else {
+                                $badge.remove();
+                            }
+                        });
+                    })
+                    .catch(function() {}); // silently ignore if counts fail
+            }
+            loadOrgCounts();
+            // Refresh counts when "view as executor" changes
+            $('#viewAsExecutor').on('change.orgCounts', loadOrgCounts);
+            @endif
+
             // ─── Org tab switching ───────────────────────────────────────
             $('#orgTabBar').on('click', '.org-tab', function () {
                 $('#orgTabBar .org-tab').removeClass('active btn-primary').addClass('btn-outline-primary');
