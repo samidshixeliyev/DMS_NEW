@@ -433,20 +433,18 @@ class LegalActController extends Controller
         $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
         $helperExecutors = $legalAct->executors->where('pivot.role', 'helper')->values();
 
-        // Determine which department IDs' executors may appear as tabs in the modal.
-        // Rule: own dept + all ancestors (upward chain only).
-        //   - Root dept viewer → ancestors = [], so only own-dept executors show → single group → no tab nav.
-        //   - Level-N viewer → own dept + every parent up to root → never siblings, never children.
+        // Determine which department IDs' executors may appear in the modal.
+        // Rule: own dept + all descendants (downward only).
+        //   Higher depts can see their subordinates' executor data.
+        //   Lower depts never see ancestor or sibling executor data.
         // Admin: unrestricted (null = show all).
         $viewerTabDeptIds = null;
         if (!$user->isAdmin() && $user->department_id) {
-            $ownDeptId        = (int) $user->department_id;
-            $ancestorIds      = Department::find($ownDeptId)?->ancestorIds() ?? [];
-            $viewerTabDeptIds = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            // descendantIdsOf includes self + all recursive children
+            $viewerTabDeptIds = Department::descendantIdsOf((int) $user->department_id);
         }
 
-        // Filter executor lists to own dept + ancestors only.
-        // Siblings and child departments are intentionally excluded.
+        // Filter executor lists: only executors whose dept is in the viewer's subtree.
         if ($viewerTabDeptIds !== null) {
             $mainExecutors   = $mainExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds))->values();
             $helperExecutors = $helperExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds))->values();
