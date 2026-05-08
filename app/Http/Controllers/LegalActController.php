@@ -428,34 +428,26 @@ class LegalActController extends Controller
         $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
         $helperExecutors = $legalAct->executors->where('pivot.role', 'helper')->values();
 
-        // Determine the set of department IDs this viewer may see executor data for.
-        // null = unrestricted (admin, or manager with no can_assign scope).
-        // array = restrict to own department subtree only (prevents cross-dept tab leakage).
-        $viewerSubtreeDeptIds = null;
-        if (!$user->isAdmin()) {
-            if ($user->canManage()) {
-                $assignDeptId = $user->canAssignDeptId();
-                if ($assignDeptId) {
-                    $ownDeptId            = $user->department_id ?? $assignDeptId;
-                    $viewerSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);
-                }
-                // Manager with no can_assign ancestry: unrestricted (null)
-            } else {
-                // Regular user / executor role
-                if ($user->department_id) {
-                    $viewerSubtreeDeptIds = Department::descendantIdsOf($user->department_id);
-                }
-            }
+        // Determine which department IDs' executors may appear as tabs in the modal.
+        // Rule: own dept + all ancestors (upward chain only).
+        //   - Root dept viewer → ancestors = [], so only own-dept executors show → single group → no tab nav.
+        //   - Level-N viewer → own dept + every parent up to root → never siblings, never children.
+        // Admin: unrestricted (null = show all).
+        $viewerTabDeptIds = null;
+        if (!$user->isAdmin() && $user->department_id) {
+            $ownDeptId        = (int) $user->department_id;
+            $ancestorIds      = Department::find($ownDeptId)?->ancestorIds() ?? [];
+            $viewerTabDeptIds = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
         }
 
-        // Filter executor lists to only those in the viewer's department subtree.
-        // This prevents unrelated department executor tabs from appearing in the modal.
-        if ($viewerSubtreeDeptIds !== null) {
-            $mainExecutors   = $mainExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerSubtreeDeptIds))->values();
-            $helperExecutors = $helperExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerSubtreeDeptIds))->values();
+        // Filter executor lists to own dept + ancestors only.
+        // Siblings and child departments are intentionally excluded.
+        if ($viewerTabDeptIds !== null) {
+            $mainExecutors   = $mainExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds))->values();
+            $helperExecutors = $helperExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds))->values();
         }
 
-        // After filtering, all remaining executors are in scope — show their private task descriptions.
+        // All remaining executors are in scope — expose their private task descriptions.
         $mapExecutor = function ($e) {
             return [
                 'id'               => $e->id,
@@ -466,15 +458,13 @@ class LegalActController extends Controller
             ];
         };
 
-        // Collect the IDs of the (already-filtered) executors so we can scope status_logs too.
+        // Collect filtered executor IDs and scope status_logs to the same set.
         $allowedExecutorIds = $mainExecutors->pluck('id')
             ->merge($helperExecutors->pluck('id'))
             ->unique()
             ->toArray();
 
-        // Filter status_logs: if viewer has a scope, only include logs whose executor is in scope.
-        // Logs without an executor_id (orphan logs) are included only for unrestricted viewers.
-        $filteredLogs = $viewerSubtreeDeptIds === null
+        $filteredLogs = $viewerTabDeptIds === null
             ? $legalAct->statusLogs
             : $legalAct->statusLogs->filter(
                 fn($log) => $log->user?->executor_id !== null
