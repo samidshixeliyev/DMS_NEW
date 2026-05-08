@@ -51,22 +51,19 @@ class ExecutorDashboardController extends Controller
             $allExecutors = collect();
         }
 
-        // Org-filter tabs: own dept + ancestor can_assign=true depts (upward chain).
-        // Departments with can_assign=false get NO tabs at all.
+        // Org-filter tabs: own dept + all ancestors filtered to can_assign=true.
+        // can_assign=false own dept is excluded automatically by the where clause.
         $visibleOrgs = collect();
         if ($user->department_id) {
-            $ownDeptId = (int) $user->department_id;
-            $ownDept   = Department::active()->find($ownDeptId);
-            if ($ownDept?->can_assign) {
-                $ancestorIds = $ownDept->ancestorIds() ?? [];
-                $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
-                $visibleOrgs = Department::active()
-                    ->whereIn('id', $tabDeptIds)
-                    ->where('can_assign', true)
-                    ->orderBy('name')
-                    ->get();
-            }
-            // can_assign=false: no tabs
+            $ownDeptId   = (int) $user->department_id;
+            $ownDept     = Department::active()->find($ownDeptId);
+            $ancestorIds = $ownDept?->ancestorIds() ?? [];
+            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            $visibleOrgs = Department::active()
+                ->whereIn('id', $tabDeptIds)
+                ->where('can_assign', true)
+                ->orderBy('name')
+                ->get();
         }
 
         return view('executor.index', compact('executionNotes', 'allExecutors', 'visibleOrgs'));
