@@ -432,8 +432,11 @@
                                 <select name="main_executor_ids[]" class="form-select modal-select2-multi" multiple
                                     required>
                                     @foreach($executors as $e)
-                                        <option value="{{ $e->id }}" {{ in_array($e->id, (array) old('main_executor_ids', [])) ? 'selected' : '' }}>
-                                            {{ $e->name }}{{ $e->department ? ' — ' . $e->department->name : '' }}
+                                        @php $isSelf = auth()->user()->executor_id && $e->id == auth()->user()->executor_id; @endphp
+                                        <option value="{{ $e->id }}"
+                                            {{ in_array($e->id, (array) old('main_executor_ids', [])) ? 'selected' : '' }}
+                                            {{ $isSelf ? 'disabled' : '' }}>
+                                            {{ $e->name }}{{ $e->department ? ' — ' . $e->department->name : '' }}{{ $isSelf ? ' (siz)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -447,8 +450,11 @@
                                 </label>
                                 <select name="helper_executor_ids[]" class="form-select modal-select2-multi" multiple>
                                     @foreach($executors as $e)
-                                        <option value="{{ $e->id }}" {{ in_array($e->id, (array) old('helper_executor_ids', [])) ? 'selected' : '' }}>
-                                            {{ $e->name }}{{ $e->department ? ' — ' . $e->department->name : '' }}
+                                        @php $isSelf = auth()->user()->executor_id && $e->id == auth()->user()->executor_id; @endphp
+                                        <option value="{{ $e->id }}"
+                                            {{ in_array($e->id, (array) old('helper_executor_ids', [])) ? 'selected' : '' }}
+                                            {{ $isSelf ? 'disabled' : '' }}>
+                                            {{ $e->name }}{{ $e->department ? ' — ' . $e->department->name : '' }}{{ $isSelf ? ' (siz)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -562,6 +568,9 @@
     <script src="../../js/mammoth.browser.min.js"></script>
     <script src="{{ asset('js/document-preview.js') }}"></script>
     <script>
+        // The current user's executor_id — used to prevent self-assignment in the UI.
+        var _selfExecutorId = {{ auth()->user()->executor_id ? auth()->user()->executor_id : 'null' }};
+
         function syncExecutorSelects($modal) {
             var $main = $modal.find('select[name="main_executor_ids[]"]');
             var $helper = $modal.find('select[name="helper_executor_ids[]"]');
@@ -571,10 +580,12 @@
                 var helperVals = ($helper.val() || []).map(String);
 
                 $helper.find('option').each(function () {
-                    $(this).prop('disabled', mainVals.indexOf(this.value) !== -1);
+                    var isSelf = (_selfExecutorId !== null && String(this.value) === String(_selfExecutorId));
+                    $(this).prop('disabled', isSelf || mainVals.indexOf(this.value) !== -1);
                 });
                 $main.find('option').each(function () {
-                    $(this).prop('disabled', helperVals.indexOf(this.value) !== -1);
+                    var isSelf = (_selfExecutorId !== null && String(this.value) === String(_selfExecutorId));
+                    $(this).prop('disabled', isSelf || helperVals.indexOf(this.value) !== -1);
                 });
 
                 $main.trigger('change.select2');
@@ -590,6 +601,15 @@
             $modal.find('form').on('submit', function (e) {
                 var main = ($modal.find('select[name="main_executor_ids[]"]').val() || []).map(String);
                 var helper = ($modal.find('select[name="helper_executor_ids[]"]').val() || []).map(String);
+                // Self-assignment guard
+                if (_selfExecutorId !== null) {
+                    var selfStr = String(_selfExecutorId);
+                    if (main.indexOf(selfStr) !== -1 || helper.indexOf(selfStr) !== -1) {
+                        e.preventDefault();
+                        alert('Siz özünüzü icraçı kimi təyin edə bilməzsiniz.');
+                        return false;
+                    }
+                }
                 var overlap = main.filter(function (v) { return helper.indexOf(v) !== -1; });
                 if (overlap.length > 0) {
                     e.preventDefault();
@@ -919,7 +939,10 @@
                 return executors.map(function (e) {
                     var dept = e.department ? ' — ' + e.department.name : '';
                     var sel = selectedIds.indexOf(e.id) !== -1 ? ' selected' : '';
-                    return '<option value="' + e.id + '"' + sel + '>' + escapeHtml(e.name + dept) + '</option>';
+                    var isSelf = (_selfExecutorId !== null && e.id == _selfExecutorId);
+                    var disabled = isSelf ? ' disabled title="Özünüzü icraçı təyin edə bilməzsiniz"' : '';
+                    var label = escapeHtml(e.name + dept) + (isSelf ? ' (siz)' : '');
+                    return '<option value="' + e.id + '"' + sel + disabled + '>' + label + '</option>';
                 }).join('');
             }
 

@@ -362,6 +362,11 @@ class LegalActController extends Controller
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
         }
 
+        // Prevent self-assignment: the logged-in user cannot assign themselves as an executor.
+        if ($user->executor_id && in_array((int) $user->executor_id, array_merge($mainIds, $helperIds))) {
+            return back()->withErrors(['main_executor_ids' => 'Siz özünüzü icraçı kimi təyin edə bilməzsiniz.'])->withInput();
+        }
+
         if (!$user->isAdmin() && ($assignDeptId = $user->canAssignDeptId())) {
             $allowedDeptIds = Department::descendantIdsOf($assignDeptId);
             $forbidden = Executor::whereIn('id', array_merge($mainIds, $helperIds))
@@ -641,6 +646,11 @@ class LegalActController extends Controller
 
         if (array_intersect($mainIds, $helperIds)) {
             return back()->withErrors(['main_executor_ids' => 'Eyni icraçı həm əsas həm də digər ola bilməz.'])->withInput();
+        }
+
+        // Prevent self-assignment: the logged-in user cannot assign themselves as an executor.
+        if ($user->executor_id && in_array((int) $user->executor_id, array_merge($mainIds, $helperIds))) {
+            return back()->withErrors(['main_executor_ids' => 'Siz özünüzü icraçı kimi təyin edə bilməzsiniz.'])->withInput();
         }
 
         if (!$user->isAdmin() && ($assignDeptId = $user->canAssignDeptId())) {

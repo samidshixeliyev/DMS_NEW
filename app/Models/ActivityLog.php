@@ -37,18 +37,24 @@ class ActivityLog extends Model
         ?string $subjectType = null,
         ?int    $subjectId   = null
     ): void {
+        // Use DB::table (raw query builder) instead of Eloquent::create().
+        // SQL Server's PDO driver can silently discard Eloquent inserts when
+        // SCOPE_IDENTITY() fails to resolve after the INSERT, leaving no row.
+        // The raw insert bypasses that issue entirely.
         try {
-            static::create([
+            $now = now()->toDateTimeString();
+            \Illuminate\Support\Facades\DB::table('activity_logs')->insert([
                 'user_id'      => auth()->id(),
                 'action'       => $action,
                 'subject_type' => $subjectType,
                 'subject_id'   => $subjectId,
                 'description'  => $description,
                 'ip_address'   => request()->ip(),
+                'created_at'   => $now,
+                'updated_at'   => $now,
             ]);
         } catch (\Throwable $e) {
             // Never let logging failures break the main request.
-            // Write to the Laravel log so the issue is visible.
             \Illuminate\Support\Facades\Log::error('ActivityLog::record() failed', [
                 'action'      => $action,
                 'description' => $description,
