@@ -637,6 +637,16 @@
                 return p;
             }
 
+            // Initialize active org BEFORE DataTable so the very first AJAX request already
+            // sends col[organization_id] and matches the visually-active first tab.
+            // Admin keeps null (sees all records by default); non-admin pre-selects the first
+            // (root-most) tab so the initial load matches what is highlighted in the UI.
+            @if($visibleOrgs->count() > 0 && !$isAdmin)
+            window._activeOrgId = {{ $visibleOrgs->first()->id }};
+            @else
+            window._activeOrgId = null;
+            @endif
+
             var table = $('#legalActsTable').DataTable({
                 processing: true, serverSide: true,
                 ajax: {
@@ -684,13 +694,6 @@
                     $sd.after($w.find('.dataTables_info,.dataTables_paginate').closest('.d-flex'));
                 }
             });
-
-            // Initialize active org — first tab is selected by default
-            @if($visibleOrgs->count() > 0)
-            window._activeOrgId = {{ $visibleOrgs->first()->id }};
-            @else
-            window._activeOrgId = null;
-            @endif
 
             // Org tab switching
             $('#orgTabBar').on('click', '.org-tab', function () {

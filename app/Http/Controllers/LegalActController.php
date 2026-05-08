@@ -846,17 +846,32 @@ class LegalActController extends Controller
         if ($user->isAdmin()) return null;
         if (!$user->effectiveDeptId()) return [];
 
-        $ownDeptId = $user->effectiveDeptId();
-        $ownDept   = Department::find($ownDeptId);
+        $ownDeptId   = $user->effectiveDeptId();
+        $ownDept     = Department::find($ownDeptId);
+        $ancestorIds = $ownDept?->ancestorIds() ?? [];
 
-        if ($ownDept?->can_assign) {
-            return [$ownDeptId];
+        // Always default to the root-most (topmost ancestor) visible tab so the initial
+        // server-side load matches what is visually highlighted in the UI (first tab = root).
+        // ancestorIds = [immediate parent, …, root] — last element is the topmost ancestor.
+        if (!empty($ancestorIds)) {
+            // Find the root-most ancestor that has can_assign=true (appears in the tabs).
+            $canAssignIds = Department::whereIn('id', $ancestorIds)
+                ->where('can_assign', true)
+                ->pluck('id')
+                ->toArray();
+
+            // Walk from root (end of ancestorIds) to find the topmost can_assign dept.
+            foreach (array_reverse($ancestorIds) as $ancId) {
+                if (in_array((int) $ancId, $canAssignIds)) {
+                    return [(int) $ancId];
+                }
+            }
         }
 
-        // can_assign=false: walk to the root (last element of ancestorIds = topmost ancestor).
-        $ancestorIds = $ownDept?->ancestorIds() ?? [];
-        $rootId      = !empty($ancestorIds) ? (int) end($ancestorIds) : $ownDeptId;
-        return [$rootId];
+        // No can_assign ancestor exists: own dept is the root of its hierarchy.
+        // If own dept itself is can_assign=true it is the first (and only) tab.
+        // If can_assign=false it has no tabs — fall back to own dept for visibility.
+        return [$ownDeptId];
     }
 
     private function applyFilters(Request $request)
