@@ -64,7 +64,7 @@ class ActTypeController extends Controller
 
         ActType::create($validated);
 
-        return redirect()->route('act-types.index')->with('success', 'Act Type created successfully.');
+        return redirect()->route('act-types.index')->with('success', 'Akt növü uğurla yaradıldı.');
     }
 
     public function show(ActType $actType)
@@ -93,13 +93,13 @@ class ActTypeController extends Controller
 
         $actType->update($validated);
 
-        return redirect()->route('act-types.index')->with('success', 'Act Type updated successfully.');
+        return redirect()->route('act-types.index')->with('success', 'Akt növü uğurla yeniləndi.');
     }
 
     public function destroy(ActType $actType)
     {
         $actType->update(['is_deleted' => true]);
 
-        return redirect()->route('act-types.index')->with('success', 'Act Type deleted successfully.');
+        return redirect()->route('act-types.index')->with('success', 'Akt növü uğurla silindi.');
     }
 }

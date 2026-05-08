@@ -21,7 +21,7 @@ class IssuingAuthorityController extends Controller
 
         IssuingAuthority::create($validated);
 
-        return redirect()->route('issuing-authorities.index')->with('success', 'Issuing Authority created successfully.');
+        return redirect()->route('issuing-authorities.index')->with('success', 'Qəbul edən orqan uğurla yaradıldı.');
     }
 
     public function show(IssuingAuthority $issuingAuthority)
@@ -49,13 +49,13 @@ class IssuingAuthorityController extends Controller
 
         $issuingAuthority->update($validated);
 
-        return redirect()->route('issuing-authorities.index')->with('success', 'Issuing Authority updated successfully.');
+        return redirect()->route('issuing-authorities.index')->with('success', 'Qəbul edən orqan uğurla yeniləndi.');
     }
 
     public function destroy(IssuingAuthority $issuingAuthority)
     {
         $issuingAuthority->update(['is_deleted' => true]);
 
-        return redirect()->route('issuing-authorities.index')->with('success', 'Issuing Authority deleted successfully.');
+        return redirect()->route('issuing-authorities.index')->with('success', 'Qəbul edən orqan uğurla silindi.');
     }
 }

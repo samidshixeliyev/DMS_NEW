@@ -64,7 +64,7 @@ class ExecutionNoteController extends Controller
 
         ExecutionNote::create($validated);
 
-        return redirect()->route('execution-notes.index')->with('success', 'Execution Note created successfully.');
+        return redirect()->route('execution-notes.index')->with('success', 'İcra qeydi uğurla yaradıldı.');
     }
 
     public function show(ExecutionNote $executionNote)
@@ -92,13 +92,13 @@ class ExecutionNoteController extends Controller
 
         $executionNote->update($validated);
 
-        return redirect()->route('execution-notes.index')->with('success', 'Execution Note updated successfully.');
+        return redirect()->route('execution-notes.index')->with('success', 'İcra qeydi uğurla yeniləndi.');
     }
 
     public function destroy(ExecutionNote $executionNote)
     {
         $executionNote->update(['is_deleted' => true]);
 
-        return redirect()->route('execution-notes.index')->with('success', 'Execution Note deleted successfully.');
+        return redirect()->route('execution-notes.index')->with('success', 'İcra qeydi uğurla silindi.');
     }
 }

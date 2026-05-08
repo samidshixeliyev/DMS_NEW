@@ -75,7 +75,7 @@ class ExecutorController extends Controller
 
         Executor::create($validated);
 
-        return redirect()->route('executors.index')->with('success', 'Executor created successfully.');
+        return redirect()->route('executors.index')->with('success', 'İcraçı uğurla yaradıldı.');
     }
 
     public function show(Executor $executor)
@@ -112,13 +112,13 @@ class ExecutorController extends Controller
 
         $executor->update($validated);
 
-        return redirect()->route('executors.index')->with('success', 'Executor updated successfully.');
+        return redirect()->route('executors.index')->with('success', 'İcraçı uğurla yeniləndi.');
     }
 
     public function destroy(Executor $executor)
     {
         $executor->update(['is_deleted' => true]);
 
-        return redirect()->route('executors.index')->with('success', 'Executor deleted successfully.');
+        return redirect()->route('executors.index')->with('success', 'İcraçı uğurla silindi.');
     }
 }
