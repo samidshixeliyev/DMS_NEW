@@ -832,8 +832,9 @@ class LegalActController extends Controller
     }
 
     /**
-     * Return the organisation IDs the current user may see by default (no tab selected).
-     * Rule: own department + all ancestors (same set as the org-filter tab buttons).
+     * Return the organisation IDs the current user sees on the initial load (no tab selected).
+     * Rule: own department only. Ancestor org records are accessible by clicking their tab,
+     * but must not appear in the default unfiltered view.
      * Returns null for admins (unrestricted).
      */
     private function defaultOrgIds(): ?array
@@ -842,9 +843,7 @@ class LegalActController extends Controller
         if ($user->isAdmin()) return null;
         if (!$user->department_id) return [];
 
-        $ownDeptId   = (int) $user->department_id;
-        $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
-        return array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+        return [(int) $user->department_id];
     }
 
     private function applyFilters(Request $request)
