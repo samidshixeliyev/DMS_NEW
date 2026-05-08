@@ -265,7 +265,7 @@ class ExecutorDashboardController extends Controller
             'actType',
             'issuingAuthority',
             'executors.department',
-            'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser.department'])->reorder('created_at', 'asc'),
+            'statusLogs' => fn($q) => $q->with(['executionNote', 'user.executor.department', 'user.department', 'attachments', 'approvedByUser.department'])->reorder('created_at', 'asc'),
             'attachments.user',
             'insertedUser.department',
         ]);
@@ -312,6 +312,10 @@ class ExecutorDashboardController extends Controller
             'status_logs'         => $legalAct->statusLogs->map(fn($log) => [
                 'id'              => $log->id,
                 'user'            => $log->user?->full_name,
+                // Prefer the executor record's department (authoritative for executor-role users),
+                // fall back to the user's own department_id for manager/admin submitters.
+                'user_department' => $log->user?->executor?->department?->name
+                    ?? $log->user?->department?->name,
                 'executor_id'     => $log->user?->executor_id,
                 'note'            => $log->executionNote?->note,
                 'custom_note'     => $log->custom_note,

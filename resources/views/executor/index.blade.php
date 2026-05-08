@@ -544,9 +544,14 @@
                     else if (log.approval_status === 'rejected') accent = '#dc2626';
                     else if (log.approval_status === 'pending') accent = '#ca8a04';
                     else if (log.approval_status === 'partial') accent = '#0284c7';
+                    var userLabel = escapeHtml(log.user || '');
+                    if (log.user_department) {
+                        userLabel += ' <span class="badge rounded-pill" style="background:#e0f2fe;color:#0369a1;font-size:0.62rem;font-weight:500;vertical-align:middle">'
+                            + '<i class="bi bi-building" style="font-size:0.6rem"></i> ' + escapeHtml(log.user_department) + '</span>';
+                    }
                     logsHtml += '<div class="timeline-item" style="--accent:' + accent + '">'
                         + '<div class="tl-date">' + escapeHtml(log.date || '') + '</div>'
-                        + '<div class="tl-user"><i class="bi bi-person me-1"></i>' + escapeHtml(log.user || '') + '</div>'
+                        + '<div class="tl-user"><i class="bi bi-person me-1"></i>' + userLabel + '</div>'
                         + '<div class="tl-note">' + escapeHtml(log.note || '') + '</div>'
                         + (log.custom_note ? '<div class="tl-custom">"' + escapeHtml(log.custom_note) + '"</div>' : '');
                     if (log.approval_status) {
