@@ -79,6 +79,10 @@
                                     required>
                             </div>
                             <div class="col-12">
+                                <label class="form-label">E-poçt <small class="text-muted">(ixtiyari — gələcəkdə bildiriş üçün)</small></label>
+                                <input type="email" name="email" class="form-control" value="{{ old('email') }}" placeholder="example@domain.com" autocomplete="off">
+                            </div>
+                            <div class="col-12">
                                 <label class="form-label">İstifadəçi adı <span class="text-danger">*</span></label>
                                 <input type="text" name="username" id="create_username" class="form-control" value="{{ old('username') }}" required autocomplete="off">
                                 <div id="create_username_feedback" class="form-text"></div>
@@ -167,6 +171,10 @@
                             <div class="col-md-6">
                                 <label class="form-label">Soyad <span class="text-danger">*</span></label>
                                 <input type="text" name="surname" id="edit_surname" class="form-control" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">E-poçt <small class="text-muted">(ixtiyari — gələcəkdə bildiriş üçün)</small></label>
+                                <input type="email" name="email" id="edit_email" class="form-control" placeholder="example@domain.com" autocomplete="off">
                             </div>
                             <div class="col-12">
                                 <label class="form-label">İstifadəçi adı <span class="text-danger">*</span></label>
@@ -450,11 +458,15 @@
             const data = await fetchJson(`/users/${id}`);
             if (!data) return;
 
+            var emailCell = data.email
+                ? `<a href="mailto:${escapeHtml(data.email)}" class="text-decoration-none"><i class="bi bi-envelope me-1"></i>${escapeHtml(data.email)}</a>`
+                : '<span class="text-muted">-</span>';
             document.getElementById('showModalBody').innerHTML = `
             <table class="table table-bordered detail-table mb-0">
                 <tr><th width="35%">ID</th><td>${escapeHtml(String(data.id))}</td></tr>
                 <tr><th>Ad</th><td>${escapeHtml(data.name)}</td></tr>
                 <tr><th>Soyad</th><td>${escapeHtml(data.surname)}</td></tr>
+                <tr><th>E-poçt</th><td>${emailCell}</td></tr>
                 <tr><th>İstifadəçi adı</th><td>${escapeHtml(data.username)}</td></tr>
                 <tr><th>Rol</th><td>${escapeHtml(roleLabels[data.user_role] || data.user_role)}</td></tr>
                 <tr><th>Rəhbər icraçı</th><td>${escapeHtml(data.executor_name || '-')}</td></tr>
@@ -470,8 +482,9 @@
             const data = await fetchJson(`/users/${id}/edit`);
             if (!data) return;
 
-            document.getElementById('edit_name').value = data.name || '';
+            document.getElementById('edit_name').value    = data.name    || '';
             document.getElementById('edit_surname').value = data.surname || '';
+            document.getElementById('edit_email').value   = data.email   || '';
             document.getElementById('edit_username').value = data.username || '';
             document.getElementById('edit_user_role').value = data.user_role || 'user';
             var deptSelect = document.getElementById('edit_department_id');

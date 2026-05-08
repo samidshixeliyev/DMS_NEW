@@ -46,6 +46,7 @@ class UserController extends Controller
             'id'           => $u->id,
             'name'         => $u->name,
             'surname'      => $u->surname,
+            'email'        => $u->email,
             'username'     => $u->username,
             'user_role'    => $u->user_role,
             'roleLabel'    => $roleMap[$u->user_role] ?? $u->user_role,
@@ -104,8 +105,9 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'surname' => 'required|string|max:255',
+            'name'     => 'required|string|max:255',
+            'surname'  => 'required|string|max:255',
+            'email'    => 'nullable|email|max:255|unique:users,email',
             'username' => 'required|string|max:255|unique:users,username',
             'password' => 'required|string|min:6|confirmed',
             'user_role' => 'required|in:admin,manager,user,executor',
@@ -145,15 +147,16 @@ class UserController extends Controller
     {
         $user->load('executor.department', 'department');
         return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'surname' => $user->surname,
-            'username' => $user->username,
-            'user_role' => $user->user_role,
-            'executor_name' => $user->executor?->name,
+            'id'                  => $user->id,
+            'name'                => $user->name,
+            'surname'             => $user->surname,
+            'email'               => $user->email,
+            'username'            => $user->username,
+            'user_role'           => $user->user_role,
+            'executor_name'       => $user->executor?->name,
             'executor_department' => $user->executor?->department?->name,
-            'department_name' => $user->department?->name,
-            'created_at' => $user->created_at?->format('d.m.Y H:i'),
+            'department_name'     => $user->department?->name,
+            'created_at'          => $user->created_at?->format('d.m.Y H:i'),
         ]);
     }
 
@@ -161,23 +164,25 @@ class UserController extends Controller
     {
         $executors = Executor::with('department')->active()->get();
         return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'surname' => $user->surname,
-            'username' => $user->username,
-            'user_role' => $user->user_role,
-            'executor_id' => $user->executor_id,
+            'id'            => $user->id,
+            'name'          => $user->name,
+            'surname'       => $user->surname,
+            'email'         => $user->email,
+            'username'      => $user->username,
+            'user_role'     => $user->user_role,
+            'executor_id'   => $user->executor_id,
             'department_id' => $user->department_id,
-            'departments' => \App\Models\Department::active()->get(),
-            'executors' => $executors,
+            'departments'   => \App\Models\Department::active()->get(),
+            'executors'     => $executors,
         ]);
     }
 
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'surname' => 'required|string|max:255',
+            'name'     => 'required|string|max:255',
+            'surname'  => 'required|string|max:255',
+            'email'    => ['nullable', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:6|confirmed',
             'user_role' => 'required|in:admin,manager,user,executor',
