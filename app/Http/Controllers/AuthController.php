@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -28,6 +29,7 @@ class AuthController extends Controller
         // Only allow active users
         if (Auth::attempt(array_merge($credentials, ['is_deleted' => false]), $request->boolean('remember'))) {
             $request->session()->regenerate();
+            ActivityLog::record(ActivityLog::ACTION_LOGIN, 'Sistemə daxil oldu');
             return redirect()->intended(route('legal-acts.index'));
         }
 

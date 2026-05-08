@@ -40,23 +40,24 @@ class ExecutorDashboardController extends Controller
             abort(403, 'Sizin icraçı profiliniz yoxdur.');
         $executionNotes = ExecutionNote::active()->get();
 
-        // Admin sees all executors; managers only see executors within their assignable dept subtree
+        // Admin sees all executors; managers only see executors within their OWN dept subtree
+        // (not the whole can_assign ancestor subtree — that would expose sibling depts).
         if ($user->isAdmin()) {
             $allExecutors = \App\Models\Executor::with('department')->active()->get();
-        } elseif ($user->canManage() && ($assignDeptId = $user->canAssignDeptId())) {
-            $deptIds      = Department::descendantIdsOf($assignDeptId);
+        } elseif ($user->canManage() && $user->canAssignDeptId() && $user->department_id) {
+            $deptIds      = Department::descendantIdsOf($user->department_id);
             $allExecutors = \App\Models\Executor::with('department')->active()->whereIn('department_id', $deptIds)->get();
         } else {
             $allExecutors = collect();
         }
 
-        // Build org tabs: the canAssignDeptId org + all its ancestors (orgs that can assign tasks to this user)
-        // Ordered ancestors-first so the highest org appears as the first tab.
+        // Build org tabs: user's own dept + all ancestors above it.
+        // Own dept covers tasks IT created; ancestors cover tasks flowing down into this dept's executors.
         $visibleOrgs = collect();
-        if ($assignDeptId = $user->canAssignDeptId()) {
-            $own         = Department::find($assignDeptId);
-            $ancestorIds = $own?->ancestorIds() ?? [];
-            $allIds      = array_merge($ancestorIds, [$assignDeptId]);
+        if ($user->department_id && $user->canAssignDeptId()) {
+            $ownDeptId   = $user->department_id;
+            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
+            $allIds      = array_unique(array_merge([$ownDeptId], $ancestorIds));
             $orgs        = Department::whereIn('id', $allIds)->get()->keyBy('id');
             $visibleOrgs = collect($allIds)->map(fn($id) => $orgs->get($id))->filter();
         }
@@ -550,11 +551,13 @@ class ExecutorDashboardController extends Controller
         }
 
         if ($user->canManage()) {
-            $assignDeptId = $user->canAssignDeptId();
-            if (!$assignDeptId) return [];
+            if (!$user->canAssignDeptId()) return [];
 
-            $deptIds = Department::descendantIdsOf($assignDeptId);
-            $scopeIds = \App\Models\Executor::whereIn('department_id', $deptIds)
+            // Scope to the user's OWN dept subtree — never to the can_assign ancestor's subtree.
+            // This prevents siblings from seeing each other's tasks.
+            $ownDeptId = $user->department_id ?? $user->canAssignDeptId();
+            $deptIds   = Department::descendantIdsOf($ownDeptId);
+            $scopeIds  = \App\Models\Executor::whereIn('department_id', $deptIds)
                 ->where('is_deleted', false)
                 ->pluck('id')
                 ->toArray();

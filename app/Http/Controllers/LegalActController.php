@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\LegalAct;
 use App\Models\ActType;
 use App\Models\IssuingAuthority;
@@ -61,15 +62,16 @@ class LegalActController extends Controller
             }
         }
 
-        // Organizations whose tasks this user can see — used to render org-filter tabs
-        // Admin: all can_assign depts. Manager: own can_assign dept + ancestors. Others: empty.
+        // Organizations whose tasks this user can see — used to render org-filter tabs.
+        // Anchor on user's own dept: own dept (tasks it created) + every ancestor (tasks
+        // created by higher orgs that may have executors flowing into this dept's subtree).
         $visibleOrgs = collect();
         if ($user->isAdmin()) {
             $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
-        } elseif ($assignDeptId = $user->canAssignDeptId()) {
-            $own         = Department::find($assignDeptId);
-            $ancestorIds = $own?->ancestorIds() ?? [];
-            $allIds      = array_merge($ancestorIds, [$assignDeptId]);
+        } elseif ($user->department_id && $user->canAssignDeptId()) {
+            $ownDeptId   = $user->department_id;
+            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
+            $allIds      = array_unique(array_merge([$ownDeptId], $ancestorIds));
             $orgs        = Department::whereIn('id', $allIds)->get()->keyBy('id');
             $visibleOrgs = collect($allIds)->map(fn($id) => $orgs->get($id))->filter();
         }
@@ -277,8 +279,8 @@ class LegalActController extends Controller
                 'canEdit'          => $isAdmin
                     || ($canManage && $editableOrgIds === null)
                     || ($canManage && $editableOrgIds !== null && in_array((int) $act->organization_id, $editableOrgIds))
-                    || (!$canManage && $userId === $act->inserted_user_id),
-                'canDelete'        => $isAdmin,
+                    || (!$canManage && $userId === (int) $act->inserted_user_id),
+                'canDelete'        => $isAdmin || ($canManage && $userId === (int) $act->inserted_user_id),
                 'hasPendingApproval' => $anyPending,
                 'pendingLogId'     => $pendingLogId,
                 'proofRequired'    => (bool) $act->proof_required,
@@ -311,17 +313,28 @@ class LegalActController extends Controller
             'executor_tasks'      => 'nullable|array',
             'executor_tasks.*'    => 'nullable|string|max:5000',
             'legal_act_number'    => 'required|string|max:255',
-            'legal_act_date'      => 'required|date',
+            'legal_act_date'      => 'required|date_format:d.m.Y',
             'summary'             => 'required|string',
             'task_number'         => 'nullable|string|max:255',
             'task_description'    => 'nullable|string',
-            'execution_deadline'  => 'nullable|date',
+            'execution_deadline'  => 'nullable|date_format:d.m.Y',
             'related_document_number' => 'nullable|string|max:255',
-            'related_document_date'   => 'nullable|date',
+            'related_document_date'   => 'nullable|date_format:d.m.Y',
             'proof_required'      => 'nullable|boolean',
         ], $this->validationMessages());
 
-        $year   = Carbon::parse($validated['legal_act_date'])->year;
+        // Parse legal_act_date explicitly to avoid platform-specific ambiguity with d.m.Y format,
+        // then normalise all date fields to Y-m-d so Eloquent's date cast stores them correctly.
+        $legalActDateCarbon = Carbon::createFromFormat('d.m.Y', $validated['legal_act_date']);
+        $year = $legalActDateCarbon->year;
+        $validated['legal_act_date'] = $legalActDateCarbon->format('Y-m-d');
+        if (!empty($validated['execution_deadline'])) {
+            $validated['execution_deadline'] = Carbon::createFromFormat('d.m.Y', $validated['execution_deadline'])->format('Y-m-d');
+        }
+        if (!empty($validated['related_document_date'])) {
+            $validated['related_document_date'] = Carbon::createFromFormat('d.m.Y', $validated['related_document_date'])->format('Y-m-d');
+        }
+
         $exists = LegalAct::where('organization_id', $user->department_id)
             ->where('act_type_id', $validated['act_type_id'])
             ->where('legal_act_number', $validated['legal_act_number'])
@@ -381,16 +394,16 @@ class LegalActController extends Controller
         if ($user->canManage()) {
             $assignDeptId = $user->canAssignDeptId();
             if ($assignDeptId) {
-                $allowedOrgIds = Department::descendantIdsOf($assignDeptId);
-                $orgInScope    = in_array((int) $legalAct->organization_id, $allowedOrgIds);
+                // Anchor on user's own dept — mirrors applyVisibilityScope logic exactly.
+                $ownDeptId         = $user->department_id ?? $assignDeptId;
+                $ownSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);
+                $orgInScope        = in_array((int) $legalAct->organization_id, $ownSubtreeDeptIds);
 
                 if (!$orgInScope) {
-                    // Also allow tasks from ancestor orgs that have executors in this manager's own subtree
-                    // (mirrors the second condition in applyVisibilityScope)
-                    $ancestorIds       = Department::find($assignDeptId)?->ancestorIds() ?? [];
-                    $ownSubtreeDeptIds = Department::descendantIdsOf($user->department_id ?? $assignDeptId);
-                    $isAncestorOrg     = in_array((int) $legalAct->organization_id, $ancestorIds);
-                    $hasExecutorHere   = $legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists();
+                    // Allow tasks from direct ancestor orgs that have executors in this user's own subtree
+                    $ancestorIds     = Department::find($ownDeptId)?->ancestorIds() ?? [];
+                    $isAncestorOrg   = in_array((int) $legalAct->organization_id, $ancestorIds);
+                    $hasExecutorHere = $legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists();
 
                     if (!$isAncestorOrg || !$hasExecutorHere) {
                         abort(403);
@@ -518,13 +531,13 @@ class LegalActController extends Controller
             'helper_executor_ids' => $legalAct->executors->where('pivot.role', 'helper')->pluck('id')->values(),
             'executor_tasks'   => $executorTasks,
             'legal_act_number' => $legalAct->legal_act_number,
-            'legal_act_date'   => $legalAct->legal_act_date?->format('Y-m-d'),
+            'legal_act_date'   => $legalAct->legal_act_date?->format('d.m.Y'),
             'summary'          => $legalAct->summary,
             'task_number'      => $legalAct->task_number,
             'task_description' => $legalAct->task_description,
-            'execution_deadline'      => $legalAct->execution_deadline?->format('Y-m-d'),
+            'execution_deadline'      => $legalAct->execution_deadline?->format('d.m.Y'),
             'related_document_number' => $legalAct->related_document_number,
-            'related_document_date'   => $legalAct->related_document_date?->format('Y-m-d'),
+            'related_document_date'   => $legalAct->related_document_date?->format('d.m.Y'),
             'proof_required'   => (bool) $legalAct->proof_required,
             'act_types'        => ActType::active()->get(),
             'authorities'      => IssuingAuthority::active()->get(),
@@ -554,17 +567,28 @@ class LegalActController extends Controller
             'executor_tasks'      => 'nullable|array',
             'executor_tasks.*'    => 'nullable|string|max:5000',
             'legal_act_number'    => 'required|string|max:255',
-            'legal_act_date'      => 'required|date',
+            'legal_act_date'      => 'required|date_format:d.m.Y',
             'summary'             => 'required|string',
             'task_number'         => 'nullable|string|max:255',
             'task_description'    => 'nullable|string',
-            'execution_deadline'  => 'nullable|date',
+            'execution_deadline'  => 'nullable|date_format:d.m.Y',
             'related_document_number' => 'nullable|string|max:255',
-            'related_document_date'   => 'nullable|date',
+            'related_document_date'   => 'nullable|date_format:d.m.Y',
             'proof_required'      => 'nullable|boolean',
         ], $this->validationMessages());
 
-        $year   = Carbon::parse($validated['legal_act_date'])->year;
+        // Parse legal_act_date explicitly to avoid platform-specific ambiguity with d.m.Y format,
+        // then normalise all date fields to Y-m-d so Eloquent's date cast stores them correctly.
+        $legalActDateCarbon = Carbon::createFromFormat('d.m.Y', $validated['legal_act_date']);
+        $year = $legalActDateCarbon->year;
+        $validated['legal_act_date'] = $legalActDateCarbon->format('Y-m-d');
+        if (!empty($validated['execution_deadline'])) {
+            $validated['execution_deadline'] = Carbon::createFromFormat('d.m.Y', $validated['execution_deadline'])->format('Y-m-d');
+        }
+        if (!empty($validated['related_document_date'])) {
+            $validated['related_document_date'] = Carbon::createFromFormat('d.m.Y', $validated['related_document_date'])->format('Y-m-d');
+        }
+
         $exists = LegalAct::where('organization_id', $legalAct->organization_id)
             ->where('act_type_id', $validated['act_type_id'])
             ->where('legal_act_number', $validated['legal_act_number'])
@@ -614,15 +638,39 @@ class LegalActController extends Controller
             ]);
         }
 
+        $updateDescription = sprintf(
+            'Hüquqi akt yeniləndi: %s №%s (%s)',
+            $legalAct->actType?->name ?? 'Naməlum növ',
+            $legalAct->legal_act_number,
+            $legalAct->legal_act_date?->format('d.m.Y') ?? '—'
+        );
+        ActivityLog::record(ActivityLog::ACTION_UPDATE, $updateDescription, 'LegalAct', $legalAct->id);
+
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla yeniləndi.');
     }
 
     public function destroy(LegalAct $legalAct)
     {
         $user = auth()->user();
-        if (!$user->isAdmin())
-            abort(403, 'Yalnız admin silə bilər.');
+
+        $canDelete = $user->isAdmin()
+            || ($user->canManage() && (int) $legalAct->inserted_user_id === (int) $user->id);
+
+        if (!$canDelete) {
+            abort(403, 'Bu sənədi silmək icazəniz yoxdur.');
+        }
+
+        $description = sprintf(
+            'Hüquqi akt silindi: %s №%s (%s)',
+            $legalAct->actType?->name ?? 'Naməlum növ',
+            $legalAct->legal_act_number,
+            $legalAct->legal_act_date?->format('d.m.Y') ?? '—'
+        );
+
         $legalAct->update(['is_deleted' => true]);
+
+        ActivityLog::record(ActivityLog::ACTION_DELETE, $description, 'LegalAct', $legalAct->id);
+
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla silindi.');
     }
 
@@ -680,17 +728,17 @@ class LegalActController extends Controller
         $assignDeptId = $user->canAssignDeptId();
 
         if ($assignDeptId) {
-            $ancestorIds        = Department::find($assignDeptId)?->ancestorIds() ?? [];
-            // Use the user's own dept subtree (not canAssignDept subtree) so that users
-            // whose nearest can_assign ancestor is a parent dept don't see tasks assigned
-            // to that parent dept by an even-higher org.
-            $ownSubtreeDeptIds  = Department::descendantIdsOf($user->department_id ?? $assignDeptId);
+            // Anchor on the user's OWN department — never on the can_assign ancestor.
+            // This ensures siblings (same level under can_assign dept) are invisible to each other.
+            $ownDeptId         = $user->department_id ?? $assignDeptId;
+            $ownSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);   // own dept + all children downward
+            $ancestorIds       = Department::find($ownDeptId)?->ancestorIds() ?? [];  // parents up to root
 
-            $query->where(function ($q) use ($user, $assignDeptId, $ownSubtreeDeptIds, $ancestorIds) {
-                // Tasks this organization created
-                $q->where('organization_id', $assignDeptId);
+            $query->where(function ($q) use ($user, $ownSubtreeDeptIds, $ancestorIds) {
+                // Tasks created BY this user's own department or any of its subordinates
+                $q->whereIn('organization_id', $ownSubtreeDeptIds);
 
-                // Tasks from ancestor orgs assigned into this user's own dept subtree
+                // Tasks created by an ancestor org that have at least one executor in this user's own subtree
                 if (!empty($ancestorIds)) {
                     $q->orWhere(function ($sq) use ($ancestorIds, $ownSubtreeDeptIds) {
                         $sq->whereIn('organization_id', $ancestorIds)
@@ -730,16 +778,21 @@ class LegalActController extends Controller
         $assignDeptId = $user->canAssignDeptId();
 
         if ($assignDeptId) {
-            if ((int) $legalAct->organization_id === $assignDeptId) return true;
+            // Use user's own dept as anchor — consistent with applyVisibilityScope.
+            $ownDeptId         = $user->department_id ?? $assignDeptId;
+            $ownSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);
 
-            $ancestorIds = Department::find($assignDeptId)?->ancestorIds() ?? [];
-            if (in_array((int) $legalAct->organization_id, $ancestorIds)) {
-                $ownSubtreeDeptIds = Department::descendantIdsOf($user->department_id ?? $assignDeptId);
-                if ($legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists()) {
-                    return true;
-                }
+            // Act was created by own dept or one of its subordinates
+            if (in_array((int) $legalAct->organization_id, $ownSubtreeDeptIds)) return true;
+
+            // Act was created by an ancestor org and has an executor in this user's subtree
+            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
+            if (in_array((int) $legalAct->organization_id, $ancestorIds) &&
+                $legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists()) {
+                return true;
             }
 
+            // Personal executor assignment (fallback)
             if ($user->executor_id && $legalAct->executors()->where('executors.id', $user->executor_id)->exists()) {
                 return true;
             }
@@ -861,12 +914,12 @@ class LegalActController extends Controller
             'helper_executor_ids.*.exists' => 'Seçilmiş digər icraçı mövcud deyil.',
             'legal_act_number.required'   => 'Hüquqi aktın nömrəsi mütləq daxil edilməlidir.',
             'legal_act_number.max'        => 'Hüquqi aktın nömrəsi 255 simvoldan çox ola bilməz.',
-            'legal_act_date.required'     => 'Hüquqi aktın tarixi mütləq daxil edilməlidir.',
-            'legal_act_date.date'         => 'Hüquqi aktın tarixi düzgün tarix formatında olmalıdır.',
-            'summary.required'            => 'Xülasə mütləq daxil edilməlidir.',
-            'execution_deadline.date'     => 'İcra müddəti düzgün tarix formatında olmalıdır.',
-            'related_document_number.max' => 'Əlaqəli sənədin nömrəsi 255 simvoldan çox ola bilməz.',
-            'related_document_date.date'  => 'Əlaqəli sənədin tarixi düzgün tarix formatında olmalıdır.',
+            'legal_act_date.required'         => 'Hüquqi aktın tarixi mütləq daxil edilməlidir.',
+            'legal_act_date.date_format'      => 'Hüquqi aktın tarixi gün.ay.il (məs: 01.05.2026) formatında olmalıdır.',
+            'summary.required'                => 'Xülasə mütləq daxil edilməlidir.',
+            'execution_deadline.date_format'  => 'İcra müddəti gün.ay.il (məs: 01.05.2026) formatında olmalıdır.',
+            'related_document_number.max'     => 'Əlaqəli sənədin nömrəsi 255 simvoldan çox ola bilməz.',
+            'related_document_date.date_format' => 'Əlaqəli sənədin tarixi gün.ay.il (məs: 01.05.2026) formatında olmalıdır.',
         ];
     }
 }

@@ -30,6 +30,7 @@ class LegalAct extends Model
     ];
 
     protected $casts = [
+        'organization_id' => 'integer',
         'legal_act_date' => 'date',
         'execution_deadline' => 'date',
         'related_document_date' => 'date',

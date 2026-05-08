@@ -11,6 +11,7 @@ use App\Http\Controllers\ExecutionNoteController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ExecutorDashboardController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ReportController;
 
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
@@ -109,6 +110,9 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:admin')->group(function () {
+        Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+        Route::post('activity-logs/load', [ActivityLogController::class, 'load'])->name('activity-logs.load');
+
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::post('users/load', [UserController::class, 'load'])->name('users.load');

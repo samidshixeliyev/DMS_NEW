@@ -730,6 +730,16 @@
                         </a>
                         <span class="sidebar-tooltip">İstifadəçilər</span>
                     </div>
+
+                    <div class="nav-item-wrapper" style="margin-bottom:2px;">
+                        <a href="{{ route('activity-logs.index') }}"
+                            class="nav-link-inner {{ request()->routeIs('activity-logs.*') ? 'sidebar-nav-active' : '' }}"
+                            style="display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.75rem; border-radius:8px; font-size:0.82rem; font-weight:500; color:rgba(255,255,255,0.7); text-decoration:none; transition:all 0.2s; border-left:3px solid transparent;">
+                            <i class="bi bi-journal-text" style="font-size:1rem; width:20px; text-align:center;"></i>
+                            <span class="sidebar-text">Aktivlik Jurnalı</span>
+                        </a>
+                        <span class="sidebar-tooltip">Aktivlik Jurnalı</span>
+                    </div>
                 @endif
 
             </nav>
