@@ -53,25 +53,25 @@ class LegalActController extends Controller
             }
         }
 
-        // Org-filter tabs: own dept + all ancestors (upward chain only).
-        // Children and siblings are never shown as tabs — higher depts do not browse subordinates.
+        // Org-filter tabs: own dept + ancestor can_assign=true depts (upward chain).
+        // Departments with can_assign=false get NO tabs at all.
         $visibleOrgs = collect();
         if ($user->isAdmin()) {
             $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
         } elseif ($user->department_id) {
-            $ownDeptId   = (int) $user->department_id;
-            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
-            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
-            $visibleOrgs = Department::active()
-                ->whereIn('id', $tabDeptIds)
-                ->where('can_assign', true)
-                ->orderBy('name')
-                ->get();
-            // Always include own dept even if can_assign=false
-            if ($visibleOrgs->doesntContain('id', $ownDeptId)) {
-                $own = Department::active()->find($ownDeptId);
-                if ($own) $visibleOrgs = $visibleOrgs->prepend($own);
+            $ownDeptId = (int) $user->department_id;
+            $ownDept   = Department::active()->find($ownDeptId);
+            if ($ownDept?->can_assign) {
+                // Only can_assign=true depts get tabs
+                $ancestorIds = $ownDept->ancestorIds() ?? [];
+                $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+                $visibleOrgs = Department::active()
+                    ->whereIn('id', $tabDeptIds)
+                    ->where('can_assign', true)
+                    ->orderBy('name')
+                    ->get();
             }
+            // can_assign=false: $visibleOrgs stays empty — no tabs rendered
         }
 
         return view('legal_acts.index', compact(
@@ -830,10 +830,11 @@ class LegalActController extends Controller
     }
 
     /**
-     * Return the organisation IDs the current user sees on the initial load (no tab selected).
-     * Rule: own department only. Ancestor org records are accessible by clicking their tab,
-     * but must not appear in the default unfiltered view.
-     * Returns null for admins (unrestricted).
+     * Return the organisation IDs shown on initial load (no tab selected).
+     * - can_assign=true dept  → own dept only (tabs let user browse ancestors on demand).
+     * - can_assign=false dept → nearest can_assign=true ancestor's dept (no tabs; they belong
+     *   to that ancestor's operational scope and should see its documents by default).
+     * - Admin → null (unrestricted).
      */
     private function defaultOrgIds(): ?array
     {
@@ -841,7 +842,9 @@ class LegalActController extends Controller
         if ($user->isAdmin()) return null;
         if (!$user->department_id) return [];
 
-        return [(int) $user->department_id];
+        // canAssignDeptId() returns own dept id if can_assign=true, else walks up to nearest ancestor.
+        $effectiveDeptId = $user->canAssignDeptId() ?? (int) $user->department_id;
+        return [$effectiveDeptId];
     }
 
     private function applyFilters(Request $request)

@@ -51,23 +51,22 @@ class ExecutorDashboardController extends Controller
             $allExecutors = collect();
         }
 
-        // Org-filter tabs: own dept + all ancestors (upward chain only).
-        // Children and siblings are never shown — higher depts do not browse subordinates.
+        // Org-filter tabs: own dept + ancestor can_assign=true depts (upward chain).
+        // Departments with can_assign=false get NO tabs at all.
         $visibleOrgs = collect();
         if ($user->department_id) {
-            $ownDeptId   = (int) $user->department_id;
-            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
-            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
-            $visibleOrgs = Department::active()
-                ->whereIn('id', $tabDeptIds)
-                ->where('can_assign', true)
-                ->orderBy('name')
-                ->get();
-            // Always include own dept even if can_assign=false
-            if ($visibleOrgs->doesntContain('id', $ownDeptId)) {
-                $own = Department::active()->find($ownDeptId);
-                if ($own) $visibleOrgs = $visibleOrgs->prepend($own);
+            $ownDeptId = (int) $user->department_id;
+            $ownDept   = Department::active()->find($ownDeptId);
+            if ($ownDept?->can_assign) {
+                $ancestorIds = $ownDept->ancestorIds() ?? [];
+                $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+                $visibleOrgs = Department::active()
+                    ->whereIn('id', $tabDeptIds)
+                    ->where('can_assign', true)
+                    ->orderBy('name')
+                    ->get();
             }
+            // can_assign=false: no tabs
         }
 
         return view('executor.index', compact('executionNotes', 'allExecutors', 'visibleOrgs'));
