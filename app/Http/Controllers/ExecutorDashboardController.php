@@ -54,8 +54,8 @@ class ExecutorDashboardController extends Controller
         // Org-filter tabs: own dept + all ancestors filtered to can_assign=true.
         // can_assign=false own dept is excluded automatically by the where clause.
         $visibleOrgs = collect();
-        if ($user->department_id) {
-            $ownDeptId   = (int) $user->department_id;
+        if ($user->effectiveDeptId()) {
+            $ownDeptId   = $user->effectiveDeptId();
             $ownDept     = Department::active()->find($ownDeptId);
             $ancestorIds = $ownDept?->ancestorIds() ?? [];
             $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));

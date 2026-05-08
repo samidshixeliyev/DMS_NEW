@@ -116,6 +116,40 @@ class User extends Authenticatable
     }
 
     /**
+     * The effective department ID for all visibility scoping.
+     *
+     * For executor-role users the executor record's department is authoritative —
+     * user.department_id may be set differently as an administrative field.
+     * For managers and admins user.department_id is always used.
+     */
+    public function effectiveDeptId(): ?int
+    {
+        if (!$this->isAdmin() && !$this->canManage() && $this->executor_id) {
+            $execDeptId = $this->executor?->department_id;
+            if ($execDeptId) return (int) $execDeptId;
+        }
+        return $this->department_id ? (int) $this->department_id : null;
+    }
+
+    /**
+     * Like canAssignDeptId() but anchored on effectiveDeptId().
+     * Use this for scoping instead of canAssignDeptId() to ensure executor-role
+     * users are scoped to their executor's department, not user.department_id.
+     */
+    public function effectiveCanAssignDeptId(): ?int
+    {
+        $deptId = $this->effectiveDeptId();
+        if (!$deptId) return null;
+
+        $dept = \App\Models\Department::find($deptId);
+        while ($dept) {
+            if ($dept->can_assign) return $dept->id;
+            $dept = $dept->parent;
+        }
+        return null;
+    }
+
+    /**
      * Check if user is admin.
      */
     public function isAdmin(): bool

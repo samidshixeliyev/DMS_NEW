@@ -59,8 +59,8 @@ class LegalActController extends Controller
         $visibleOrgs = collect();
         if ($user->isAdmin()) {
             $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
-        } elseif ($user->department_id) {
-            $ownDeptId   = (int) $user->department_id;
+        } elseif ($user->effectiveDeptId()) {
+            $ownDeptId   = $user->effectiveDeptId();
             $ownDept     = Department::active()->find($ownDeptId);
             $ancestorIds = $ownDept?->ancestorIds() ?? [];
             $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
@@ -393,10 +393,10 @@ class LegalActController extends Controller
         $user = auth()->user();
 
         if ($user->canManage()) {
-            $assignDeptId = $user->canAssignDeptId();
+            $assignDeptId = $user->effectiveCanAssignDeptId();
             if ($assignDeptId) {
-                // Anchor on user's own dept — mirrors applyVisibilityScope logic exactly.
-                $ownDeptId         = $user->department_id ?? $assignDeptId;
+                // Anchor on effective dept — mirrors applyVisibilityScope logic exactly.
+                $ownDeptId         = $user->effectiveDeptId() ?? $assignDeptId;
                 $ownSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);
                 $orgInScope        = in_array((int) $legalAct->organization_id, $ownSubtreeDeptIds);
 
@@ -436,9 +436,9 @@ class LegalActController extends Controller
         //   Lower depts never see ancestor or sibling executor data.
         // Admin: unrestricted (null = show all).
         $viewerTabDeptIds = null;
-        if (!$user->isAdmin() && $user->department_id) {
+        if (!$user->isAdmin() && $user->effectiveDeptId()) {
             // descendantIdsOf includes self + all recursive children
-            $viewerTabDeptIds = Department::descendantIdsOf((int) $user->department_id);
+            $viewerTabDeptIds = Department::descendantIdsOf($user->effectiveDeptId());
         }
 
         // Filter executor lists: only executors whose dept is in the viewer's subtree.
@@ -744,12 +744,12 @@ class LegalActController extends Controller
     {
         if ($user->isAdmin()) return;
 
-        $assignDeptId = $user->canAssignDeptId();
+        $assignDeptId = $user->effectiveCanAssignDeptId();
 
         if ($assignDeptId) {
-            // Anchor on the user's OWN department — never on the can_assign ancestor.
+            // Anchor on the user's effective department (executor's dept for executor-role users).
             // This ensures siblings (same level under can_assign dept) are invisible to each other.
-            $ownDeptId         = $user->department_id ?? $assignDeptId;
+            $ownDeptId         = $user->effectiveDeptId() ?? $assignDeptId;
             $ownSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);   // own dept + all children downward
             $ancestorIds       = Department::find($ownDeptId)?->ancestorIds() ?? [];  // parents up to root
 
@@ -773,9 +773,9 @@ class LegalActController extends Controller
             return;
         }
 
-        if ($user->canManage() && $user->department_id) {
+        if ($user->canManage() && $user->effectiveDeptId()) {
             // Manager without a can_assign ancestry: see tasks where subtree executors are assigned
-            $deptIds = Department::descendantIdsOf($user->department_id);
+            $deptIds = Department::descendantIdsOf($user->effectiveDeptId());
             $query->whereHas('executors', fn($sq) => $sq->whereIn('executors.department_id', $deptIds));
             return;
         }
@@ -794,11 +794,11 @@ class LegalActController extends Controller
      */
     private function userCanViewAct(LegalAct $legalAct, $user): bool
     {
-        $assignDeptId = $user->canAssignDeptId();
+        $assignDeptId = $user->effectiveCanAssignDeptId();
 
         if ($assignDeptId) {
-            // Use user's own dept as anchor — consistent with applyVisibilityScope.
-            $ownDeptId         = $user->department_id ?? $assignDeptId;
+            // Use effective dept as anchor — consistent with applyVisibilityScope.
+            $ownDeptId         = $user->effectiveDeptId() ?? $assignDeptId;
             $ownSubtreeDeptIds = Department::descendantIdsOf($ownDeptId);
 
             // Act was created by own dept or one of its subordinates
@@ -836,9 +836,9 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
         if ($user->isAdmin()) return null;
-        if (!$user->department_id) return [];
+        if (!$user->effectiveDeptId()) return [];
 
-        $ownDeptId = (int) $user->department_id;
+        $ownDeptId = $user->effectiveDeptId();
         $ownDept   = Department::find($ownDeptId);
 
         if ($ownDept?->can_assign) {
