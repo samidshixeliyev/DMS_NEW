@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>DMS — Giriş</title>
 
     
@@ -315,6 +318,24 @@ function togglePassword() {
         icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
 }
+
+// Reload the page when the user returns to this tab after being away.
+// This guarantees the CSRF token in the form is always fresh and prevents 419.
+(function () {
+    var hiddenAt = null;
+    var RELOAD_AFTER_MS = 5 * 60 * 1000; // 5 minutes
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            hiddenAt = Date.now();
+        } else if (hiddenAt !== null) {
+            if (Date.now() - hiddenAt >= RELOAD_AFTER_MS) {
+                window.location.reload();
+            }
+            hiddenAt = null;
+        }
+    });
+})();
 </script>
 </body>
 </html>
