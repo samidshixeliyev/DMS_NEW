@@ -53,22 +53,21 @@ class LegalActController extends Controller
             }
         }
 
-        // Org-filter tabs: strictly downward only — own dept + can_assign subordinates.
-        // Ancestor depts are intentionally excluded to prevent upward visibility leakage.
-        // (Tasks from ancestor orgs where own executors are assigned still appear in the
-        //  unfiltered "all acts" view via applyVisibilityScope, but have no dedicated tab.)
+        // Org-filter tabs: own dept + all ancestors (upward chain only).
+        // Children and siblings are never shown as tabs — higher depts do not browse subordinates.
         $visibleOrgs = collect();
         if ($user->isAdmin()) {
             $visibleOrgs = Department::active()->where('can_assign', true)->orderBy('name')->get();
-        } elseif ($user->department_id && $user->canAssignDeptId()) {
-            $ownDeptId      = $user->department_id;
-            $subtreeIds     = Department::descendantIdsOf($ownDeptId);   // own + all children
-            $visibleOrgs    = Department::active()
-                ->whereIn('id', $subtreeIds)
+        } elseif ($user->department_id) {
+            $ownDeptId   = (int) $user->department_id;
+            $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
+            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            $visibleOrgs = Department::active()
+                ->whereIn('id', $tabDeptIds)
                 ->where('can_assign', true)
                 ->orderBy('name')
                 ->get();
-            // Always include own dept even if it has can_assign=false
+            // Always include own dept even if can_assign=false
             if ($visibleOrgs->doesntContain('id', $ownDeptId)) {
                 $own = Department::active()->find($ownDeptId);
                 if ($own) $visibleOrgs = $visibleOrgs->prepend($own);

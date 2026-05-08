@@ -51,15 +51,23 @@ class ExecutorDashboardController extends Controller
             $allExecutors = collect();
         }
 
-        // Build org tabs: user's own dept + all ancestors above it.
-        // Own dept covers tasks IT created; ancestors cover tasks flowing down into this dept's executors.
+        // Org-filter tabs: own dept + all ancestors (upward chain only).
+        // Children and siblings are never shown — higher depts do not browse subordinates.
         $visibleOrgs = collect();
-        if ($user->department_id && $user->canAssignDeptId()) {
-            $ownDeptId   = $user->department_id;
+        if ($user->department_id) {
+            $ownDeptId   = (int) $user->department_id;
             $ancestorIds = Department::find($ownDeptId)?->ancestorIds() ?? [];
-            $allIds      = array_unique(array_merge([$ownDeptId], $ancestorIds));
-            $orgs        = Department::whereIn('id', $allIds)->get()->keyBy('id');
-            $visibleOrgs = collect($allIds)->map(fn($id) => $orgs->get($id))->filter();
+            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
+            $visibleOrgs = Department::active()
+                ->whereIn('id', $tabDeptIds)
+                ->where('can_assign', true)
+                ->orderBy('name')
+                ->get();
+            // Always include own dept even if can_assign=false
+            if ($visibleOrgs->doesntContain('id', $ownDeptId)) {
+                $own = Department::active()->find($ownDeptId);
+                if ($own) $visibleOrgs = $visibleOrgs->prepend($own);
+            }
         }
 
         return view('executor.index', compact('executionNotes', 'allExecutors', 'visibleOrgs'));
