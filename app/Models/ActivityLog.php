@@ -17,6 +17,7 @@ class ActivityLog extends Model
 
     // ── Constants ──────────────────────────────────────────────────────────
     const ACTION_LOGIN  = 'login';
+    const ACTION_LOGOUT = 'logout';
     const ACTION_CREATE = 'create';
     const ACTION_UPDATE = 'update';
     const ACTION_DELETE = 'delete';

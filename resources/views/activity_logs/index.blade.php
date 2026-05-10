@@ -17,6 +17,7 @@
                     <select id="filterAction" class="form-select form-select-sm" style="min-width:160px;">
                         <option value="">Hamısı</option>
                         <option value="login">Giriş</option>
+                        <option value="logout">Çıxış</option>
                         <option value="create">Yaratma</option>
                         <option value="update">Yeniləmə</option>
                         <option value="delete">Silmə</option>

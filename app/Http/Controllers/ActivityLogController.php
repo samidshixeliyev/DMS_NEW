@@ -43,6 +43,7 @@ class ActivityLogController extends Controller
         $data = $rows->map(function (ActivityLog $log) {
             $actionLabel = match ($log->action) {
                 ActivityLog::ACTION_LOGIN  => '<span class="badge bg-success">Giriş</span>',
+                ActivityLog::ACTION_LOGOUT => '<span class="badge bg-secondary">Çıxış</span>',
                 ActivityLog::ACTION_CREATE => '<span class="badge bg-primary">Yaratma</span>',
                 ActivityLog::ACTION_UPDATE => '<span class="badge bg-warning text-dark">Yeniləmə</span>',
                 ActivityLog::ACTION_DELETE => '<span class="badge bg-danger">Silmə</span>',
