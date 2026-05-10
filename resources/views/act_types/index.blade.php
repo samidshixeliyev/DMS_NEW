@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { data: 'rowNum', className: 'text-center', orderable: false },
             { data: 'name' },
             {
-                data: null, orderable: false, searchable: false, render: function (d) {
+                data: null, orderable: false, searchable: false, className: 'text-center', render: function (d) {
                     var btns = '<div class="action-btns">';
                     btns += '<button class="btn btn-sm btn-info" title="Bax" onclick="showDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>';
                     @if(auth()->user()->user_role === 'admin')

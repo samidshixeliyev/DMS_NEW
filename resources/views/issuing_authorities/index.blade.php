@@ -27,7 +27,7 @@
                     <tr>
                         <th style="width: 70px">ID</th>
                         <th>Ad</th>
-                        <th style="width: 150px">Əməliyyat</th>
+                        <th class="text-center" style="width: 150px">Əməliyyat</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -35,8 +35,8 @@
                         <tr>
                             <td><span class="badge bg-secondary">{{ $authority->id }}</span></td>
                             <td>{{ $authority->name }}</td>
-                            <td>
-                                <div class="action-btns">
+                            <td class="text-center">
+                                <div class="action-btns" style="justify-content:center">
                                     <button type="button" class="btn btn-sm btn-info" title="Bax"
                                             onclick="showDetails({{ $authority->id }})">
                                         <i class="bi bi-eye"></i>
