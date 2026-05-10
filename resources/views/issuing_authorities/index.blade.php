@@ -5,7 +5,7 @@
 @section('content')
 <div class="page-header">
     <h2><i class="bi bi-building-check me-2"></i>Kim qəbul edib</h2>
-    @if(in_array(auth()->user()->user_role, ['admin', 'manager']))
+    @if(auth()->user()->user_role === 'admin')
     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
         <i class="bi bi-plus-circle me-1"></i> Yeni əlavə et
     </button>
@@ -41,7 +41,7 @@
                                             onclick="showDetails({{ $authority->id }})">
                                         <i class="bi bi-eye"></i>
                                     </button>
-                                    @if(in_array(auth()->user()->user_role, ['admin', 'manager']))
+                                    @if(auth()->user()->user_role === 'admin')
                                     <button type="button" class="btn btn-sm btn-warning" title="Redaktə"
                                             onclick="editRecord({{ $authority->id }})">
                                         <i class="bi bi-pencil"></i>

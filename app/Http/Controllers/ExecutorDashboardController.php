@@ -149,6 +149,15 @@ class ExecutorDashboardController extends Controller
         // The "primary" executor ID for status tracking
         $primaryExecutorId = $executorId ?? ($user->executor_id);
 
+        // Pre-load all user IDs belonging to the primary executor (for dept-mate locking)
+        $primaryExecutorAllUserIds = [];
+        if ($primaryExecutorId) {
+            $primaryExecutorAllUserIds = \App\Models\User::where('executor_id', $primaryExecutorId)
+                ->where('is_deleted', false)
+                ->pluck('id')
+                ->toArray();
+        }
+
         $viewUserIds = [$user->id];
         if ($user->canManage() && $executorId && $executorId !== $user->executor_id) {
             $viewUserIds = \App\Models\User::where('executor_id', $executorId)->pluck('id')->toArray();
@@ -211,6 +220,12 @@ class ExecutorDashboardController extends Controller
                 ? '<span class="badge bg-primary">Əsas</span>'
                 : '<span class="badge bg-info">Digər</span>';
 
+            // Check if any user in the same executor already has an approved icra-olunub log
+            $executorApproved = !empty($primaryExecutorAllUserIds) && $act->statusLogs
+                ->whereIn('user_id', $primaryExecutorAllUserIds)
+                ->filter(fn($log) => $this->isIcraOlunubNote($log->execution_note_id) && $log->approval_status === 'approved')
+                ->isNotEmpty();
+
             // canChangeStatus applies for own executor OR admin acting as a specific executor
             $isOwnExecutor   = $primaryExecutorId && $primaryExecutorId === $user->executor_id;
             $isAdminActingAs = $user->isAdmin() && $executorId !== null;
@@ -244,7 +259,7 @@ class ExecutorDashboardController extends Controller
                 'statusHtml'      => $statusHtml,
                 'roleHtml'        => $roleHtml,
                 'proofRequired'   => (bool) $act->proof_required,
-                'canChangeStatus' => !$myIsExecuted && !$myIsPending && $canAct,
+                'canChangeStatus' => !$executorApproved && !$myIsExecuted && !$myIsPending && $canAct,
                 'canWithdraw'     => $canWithdraw,
                 'graceMinsLeft'   => $graceMinsLeft,
                 'isAdminActingAs' => $isAdminActingAs,
@@ -356,8 +371,9 @@ class ExecutorDashboardController extends Controller
         $this->authorizeAccess($legalAct, $user);
 
         // Resolve the acting user: admin can act on behalf of an executor
-        $actingUserId = $user->id;
-        $isAdminOnBehalf = false;
+        $actingUserId     = $user->id;
+        $actingExecutorId = $user->executor_id;
+        $isAdminOnBehalf  = false;
         if (!$user->executor_id) {
             if (!$user->isAdmin()) {
                 abort(403, 'Yalnız icraçılar status göndərə bilər.');
@@ -370,8 +386,9 @@ class ExecutorDashboardController extends Controller
             if (!$targetUser) {
                 return back()->withErrors(['general' => 'Seçilmiş icraçıya aid istifadəçi tapılmadı.']);
             }
-            $actingUserId = $targetUser->id;
-            $isAdminOnBehalf = true;
+            $actingUserId     = $targetUser->id;
+            $actingExecutorId = $onBehalfOfExecutorId;
+            $isAdminOnBehalf  = true;
         }
 
         $validated = $request->validate([
@@ -400,6 +417,26 @@ class ExecutorDashboardController extends Controller
                     $this->deleteStatusLog($myLatestIcraLog);
                 } else {
                     return back()->withErrors(['general' => 'Sizin təsdiq gözləyən icra qeydiniz var.']);
+                }
+            }
+        }
+
+        // Block if any other user sharing the same executor already has an approved icra-olunub log.
+        // This locks the document for the whole executor once one dept-mate's submission is approved.
+        if ($actingExecutorId) {
+            $deptMateUserIds = \App\Models\User::where('executor_id', $actingExecutorId)
+                ->where('is_deleted', false)
+                ->where('id', '!=', $actingUserId)
+                ->pluck('id')
+                ->toArray();
+            if (!empty($deptMateUserIds)) {
+                $deptMateApproved = ExecutorStatusLog::where('legal_act_id', $legalAct->id)
+                    ->whereIn('user_id', $deptMateUserIds)
+                    ->whereIn('execution_note_id', $this->getIcraOlunubNoteIds())
+                    ->where('approval_status', 'approved')
+                    ->exists();
+                if ($deptMateApproved) {
+                    return back()->withErrors(['general' => 'Bu sənəd icraçı bölməniz üçün artıq başqası tərəfindən icra edilib və təsdiqlənib. Yeni status göndərmək mümkün deyil.']);
                 }
             }
         }

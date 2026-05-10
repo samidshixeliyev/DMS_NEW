@@ -413,7 +413,7 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
 
-        if ($user->canManage()) {
+        if ($user->canManage() || $user->isExecutor()) {
             $assignDeptId = $user->effectiveCanAssignDeptId();
             if ($assignDeptId) {
                 // Anchor on effective dept — mirrors applyVisibilityScope logic exactly.
@@ -428,11 +428,20 @@ class LegalActController extends Controller
                     $hasExecutorHere = $legalAct->executors()->whereIn('executors.department_id', $ownSubtreeDeptIds)->exists();
 
                     if (!$isAncestorOrg || !$hasExecutorHere) {
-                        abort(403);
+                        // Executor-role users can always see acts they are personally assigned to
+                        if (!$user->isExecutor() || !$user->executor_id ||
+                            !$legalAct->executors()->where('executors.id', $user->executor_id)->exists()) {
+                            abort(403);
+                        }
                     }
                 }
             }
-            // Manager without any can_assign ancestry: may view all acts
+            // No can_assign ancestry: managers may view all acts; executor falls through to personal check
+            elseif ($user->isExecutor()) {
+                if (!$this->userCanViewAct($legalAct, $user)) {
+                    abort(403);
+                }
+            }
         } elseif (!$this->userCanViewAct($legalAct, $user)) {
             abort(403);
         }

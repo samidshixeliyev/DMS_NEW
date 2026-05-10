@@ -65,7 +65,7 @@ Route::middleware('auth')->group(function () {
     Route::post('act-types/load', [ActTypeController::class, 'load'])->name('act-types.load');
     Route::get('act-types/{actType}', [ActTypeController::class, 'show'])->name('act-types.show');
     Route::get('act-types/{actType}/edit', [ActTypeController::class, 'edit'])->name('act-types.edit');
-    Route::middleware('role:admin,manager')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::post('act-types', [ActTypeController::class, 'store'])->name('act-types.store');
         Route::put('act-types/{actType}', [ActTypeController::class, 'update'])->name('act-types.update');
         Route::delete('act-types/{actType}', [ActTypeController::class, 'destroy'])->name('act-types.destroy');
@@ -75,7 +75,7 @@ Route::middleware('auth')->group(function () {
     Route::post('departments/load', [DepartmentController::class, 'load'])->name('departments.load');
     Route::get('departments/{department}', [DepartmentController::class, 'show'])->name('departments.show');
     Route::get('departments/{department}/edit', [DepartmentController::class, 'edit'])->name('departments.edit');
-    Route::middleware('role:admin,manager')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::post('departments', [DepartmentController::class, 'store'])->name('departments.store');
         Route::put('departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
         Route::delete('departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
@@ -85,7 +85,7 @@ Route::middleware('auth')->group(function () {
     Route::post('executors/load', [ExecutorController::class, 'load'])->name('executors.load');
     Route::get('executors/{executor}', [ExecutorController::class, 'show'])->name('executors.show');
     Route::get('executors/{executor}/edit', [ExecutorController::class, 'edit'])->name('executors.edit');
-    Route::middleware('role:admin,manager')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::post('executors', [ExecutorController::class, 'store'])->name('executors.store');
         Route::put('executors/{executor}', [ExecutorController::class, 'update'])->name('executors.update');
         Route::delete('executors/{executor}', [ExecutorController::class, 'destroy'])->name('executors.destroy');
@@ -94,7 +94,7 @@ Route::middleware('auth')->group(function () {
     Route::get('issuing-authorities', [IssuingAuthorityController::class, 'index'])->name('issuing-authorities.index');
     Route::get('issuing-authorities/{issuingAuthority}', [IssuingAuthorityController::class, 'show'])->name('issuing-authorities.show');
     Route::get('issuing-authorities/{issuingAuthority}/edit', [IssuingAuthorityController::class, 'edit'])->name('issuing-authorities.edit');
-    Route::middleware('role:admin,manager')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::post('issuing-authorities', [IssuingAuthorityController::class, 'store'])->name('issuing-authorities.store');
         Route::put('issuing-authorities/{issuingAuthority}', [IssuingAuthorityController::class, 'update'])->name('issuing-authorities.update');
         Route::delete('issuing-authorities/{issuingAuthority}', [IssuingAuthorityController::class, 'destroy'])->name('issuing-authorities.destroy');
@@ -104,7 +104,7 @@ Route::middleware('auth')->group(function () {
     Route::post('execution-notes/load', [ExecutionNoteController::class, 'load'])->name('execution-notes.load');
     Route::get('execution-notes/{executionNote}', [ExecutionNoteController::class, 'show'])->name('execution-notes.show');
     Route::get('execution-notes/{executionNote}/edit', [ExecutionNoteController::class, 'edit'])->name('execution-notes.edit');
-    Route::middleware('role:admin,manager')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::post('execution-notes', [ExecutionNoteController::class, 'store'])->name('execution-notes.store');
         Route::put('execution-notes/{executionNote}', [ExecutionNoteController::class, 'update'])->name('execution-notes.update');
         Route::delete('execution-notes/{executionNote}', [ExecutionNoteController::class, 'destroy'])->name('execution-notes.destroy');

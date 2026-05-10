@@ -5,7 +5,7 @@
 @section('content')
 <div class="page-header">
     <h2><i class="bi bi-people me-2"></i>Rəhbərlər</h2>
-    @if(in_array(auth()->user()->user_role, ['admin', 'manager']))
+    @if(auth()->user()->user_role === 'admin')
     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
         <i class="bi bi-plus-circle me-1"></i> Yeni əlavə et
     </button>
@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 data: null, orderable: false, searchable: false, render: function (d) {
                     var btns = '<div class="action-btns">';
                     btns += '<button class="btn btn-sm btn-info" title="Bax" onclick="showDetails(' + d.id + ')"><i class="bi bi-eye"></i></button>';
-                    @if(in_array(auth()->user()->user_role, ['admin', 'manager']))
+                    @if(auth()->user()->user_role === 'admin')
                     btns += '<button class="btn btn-sm btn-warning" title="Redaktə" onclick="editRecord(' + d.id + ')"><i class="bi bi-pencil"></i></button>';
                     @endif
                     @if(auth()->user()->user_role === 'admin')
