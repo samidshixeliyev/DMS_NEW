@@ -11,16 +11,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Logout is safe to exempt from CSRF: worst-case is a forced logout (no data change).
+        // This prevents the 419 PAGE EXPIRED error when the user's session has already expired.
+        $middleware->validateCsrfTokens(except: ['logout']);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Redirect to login with a clear message whenever a CSRF token mismatch
-        // occurs (419 Page Expired). This covers stale logout forms and stale
-        // login forms after a long idle session.
+        // Redirect to login on any 419 (stale login form, idle session, etc.).
+        // withErrors() is intentionally omitted — flashing to an expired session
+        // can silently fail and cause the raw 419 page to appear anyway.
         $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, $request) {
-            return redirect()->route('login')
-                ->withErrors(['session' => 'Sessiyanız başa çatdı. Zəhmət olmasa yenidən daxil olun.']);
+            return redirect()->route('login');
         });
     })->create();
