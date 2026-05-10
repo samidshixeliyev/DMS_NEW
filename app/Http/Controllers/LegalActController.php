@@ -989,25 +989,16 @@ class LegalActController extends Controller
                     ->where('approval_status', ExecutorStatusLog::APPROVAL_APPROVED)
                     ->whereHas('executionNote', $icraNote));
 
-            if ($status === 'last1day') {
+            if ($status === 'overdue') {
+                // Deadline has already passed and not yet executed
                 $query->whereNotNull('execution_deadline')
-                    ->whereDate('execution_deadline', '>=', $today)
-                    ->whereDate('execution_deadline', '<=', $today->copy()->addDays(1))
+                    ->whereDate('execution_deadline', '<', $today)
                     ->where($notExecuted);
-            } elseif ($status === 'last2days') {
+            } elseif ($status === 'due_soon') {
+                // 0, 1, or 2 days left (today through today+2) and not yet executed
                 $query->whereNotNull('execution_deadline')
                     ->whereDate('execution_deadline', '>=', $today)
                     ->whereDate('execution_deadline', '<=', $today->copy()->addDays(2))
-                    ->where($notExecuted);
-            } elseif ($status === 'last3days') {
-                $query->whereNotNull('execution_deadline')
-                    ->whereDate('execution_deadline', '>=', $today)
-                    ->whereDate('execution_deadline', '<=', $today->copy()->addDays(3))
-                    ->where($notExecuted);
-            } elseif ($status === 'expired3days') {
-                $query->whereNotNull('execution_deadline')
-                    ->whereDate('execution_deadline', '>=', $today->copy()->subDays(3))
-                    ->whereDate('execution_deadline', '<', $today)
                     ->where($notExecuted);
             } elseif ($status === 'executed') {
                 $query->whereHas('latestStatusLog', fn($q) => $q

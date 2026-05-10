@@ -315,11 +315,9 @@
                     <div class="col-xl-2 col-md-3"><label class="form-label">Müddət statusu</label><select
                             id="filter_deadline_status" class="form-select filter-select">
                             <option value="">Hamısı</option>
-                            <option value="last1day">Son 1 gün</option>
-                            <option value="last2days">Son 2 gün</option>
-                            <option value="last3days">Son 3 gün</option>
-                            <option value="expired3days">Son 3 gündə bitib</option>
-                            <option value="executed">Tamamlandı</option>
+                            <option value="overdue">Vaxtı keçib</option>
+                            <option value="due_soon">3 gün qalıb</option>
+                            <option value="executed">İcra olunub</option>
                         </select></div>
                     <div class="col-xl-2 col-md-3"><label class="form-label">Tapşırıq №</label><input type="text"
                             id="filter_task_number" class="form-control filter-el" placeholder="Axtar..."></div>
