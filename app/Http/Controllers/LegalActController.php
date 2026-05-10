@@ -522,7 +522,7 @@ class LegalActController extends Controller
             'inserted_user'       => $legalAct->insertedUser
                 ? $legalAct->insertedUser->name . ' ' . $legalAct->insertedUser->surname : null,
             'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
-            'status_logs'         => $filteredLogs->map(fn($log) => [
+            'status_logs'         => $filteredLogs->values()->map(fn($log) => [
                 'user'            => $log->user?->full_name,
                 'executor_id'     => $log->user?->executor_id,
                 'note'            => $log->executionNote?->note,

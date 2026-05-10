@@ -344,7 +344,7 @@ class ExecutorDashboardController extends Controller
             'inserted_user'            => $legalAct->insertedUser?->full_name,
             'inserted_user_department' => $legalAct->insertedUser?->department?->name,
             'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
-            'status_logs'         => $visibleLogs->map(fn($log) => [
+            'status_logs'         => $visibleLogs->values()->map(fn($log) => [
                 'id'              => $log->id,
                 'user'            => $log->user?->full_name,
                 // Prefer the executor record's department (authoritative for executor-role users),
