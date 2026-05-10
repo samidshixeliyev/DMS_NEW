@@ -51,26 +51,27 @@ class ExecutorDashboardController extends Controller
             $allExecutors = collect();
         }
 
-        // Org-filter tabs: own dept + all ancestors filtered to can_assign=true.
-        // can_assign=false own dept is excluded automatically by the where clause.
+        // Org-filter tabs: ancestor depts with can_assign=true only.
+        // Own dept is intentionally excluded — it issues tasks downward and never
+        // receives tasks from itself, so the tab would be empty and misleading.
         $visibleOrgs = collect();
         if ($user->effectiveDeptId()) {
             $ownDeptId   = $user->effectiveDeptId();
             $ownDept     = Department::active()->find($ownDeptId);
-            $ancestorIds = $ownDept?->ancestorIds() ?? [];
-            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
-            // Depth map: root ancestor = depth 0, own dept = deepest. Sort tabs root-first.
-            $depthMap = [];
-            foreach (array_reverse($ancestorIds) as $depth => $id) {
-                $depthMap[$id] = $depth;
+            $ancestorIds = array_map('intval', $ownDept?->ancestorIds() ?? []);
+            if (!empty($ancestorIds)) {
+                // Depth map: root ancestor = 0, immediate parent = deepest. Sort root-first.
+                $depthMap = [];
+                foreach (array_reverse($ancestorIds) as $depth => $id) {
+                    $depthMap[$id] = $depth;
+                }
+                $visibleOrgs = Department::active()
+                    ->whereIn('id', $ancestorIds)
+                    ->where('can_assign', true)
+                    ->get()
+                    ->sortBy(fn($dept) => $depthMap[$dept->id] ?? 999)
+                    ->values();
             }
-            $depthMap[$ownDeptId] = count($ancestorIds);
-            $visibleOrgs = Department::active()
-                ->whereIn('id', $tabDeptIds)
-                ->where('can_assign', true)
-                ->get()
-                ->sortBy(fn($dept) => $depthMap[$dept->id] ?? 999)
-                ->values();
         }
 
         return view('executor.index', compact('executionNotes', 'allExecutors', 'visibleOrgs'));
@@ -735,17 +736,18 @@ class ExecutorDashboardController extends Controller
 
         $visibleExecutorIds = $this->resolveVisibleExecutorIds($user, $executorId);
 
-        // Build the set of org IDs this user can tab between
+        // Build the set of org IDs this user can tab between (ancestors only, own dept excluded)
         $visibleOrgs = collect();
         if ($user->effectiveDeptId()) {
             $ownDeptId   = $user->effectiveDeptId();
             $ownDept     = Department::active()->find($ownDeptId);
-            $ancestorIds = $ownDept?->ancestorIds() ?? [];
-            $tabDeptIds  = array_merge([$ownDeptId], array_map('intval', $ancestorIds));
-            $visibleOrgs = Department::active()
-                ->whereIn('id', $tabDeptIds)
-                ->where('can_assign', true)
-                ->pluck('id');
+            $ancestorIds = array_map('intval', $ownDept?->ancestorIds() ?? []);
+            if (!empty($ancestorIds)) {
+                $visibleOrgs = Department::active()
+                    ->whereIn('id', $ancestorIds)
+                    ->where('can_assign', true)
+                    ->pluck('id');
+            }
         }
 
         if ($visibleOrgs->isEmpty()) {
