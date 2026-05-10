@@ -657,12 +657,15 @@
                 return p;
             }
 
-            // Initialize active org BEFORE DataTable so the very first AJAX request already
-            // sends col[organization_id] and matches the visually-active first tab.
-            // Admin keeps null (sees all records by default); non-admin pre-selects the first
-            // (root-most) tab so the initial load matches what is highlighted in the UI.
+            // Restore the active org tab from localStorage; fall back to the first tab.
             @if($visibleOrgs->count() > 0 && !$isAdmin)
-            window._activeOrgId = {{ $visibleOrgs->first()->id }};
+            (function () {
+                var stored    = localStorage.getItem('legal_acts_active_org_id');
+                var validIds  = {!! $visibleOrgs->pluck('id')->toJson() !!};
+                window._activeOrgId = (stored && validIds.includes(parseInt(stored)))
+                    ? parseInt(stored)
+                    : {{ $visibleOrgs->first()->id }};
+            })();
             @else
             window._activeOrgId = null;
             @endif
@@ -715,11 +718,23 @@
                 }
             });
 
+            // Restore visually active tab to match _activeOrgId after DataTable init
+            @if($visibleOrgs->count() > 1 && !$isAdmin)
+            (function () {
+                if (!window._activeOrgId) return;
+                var $tabs = $('#orgTabBar .org-tab');
+                $tabs.removeClass('active btn-primary').addClass('btn-outline-primary');
+                var $match = $tabs.filter('[data-org-id="' + window._activeOrgId + '"]');
+                ($match.length ? $match : $tabs.first()).removeClass('btn-outline-primary').addClass('btn-primary active');
+            })();
+            @endif
+
             // Org tab switching
             $('#orgTabBar').on('click', '.org-tab', function () {
                 $('#orgTabBar .org-tab').removeClass('active btn-primary').addClass('btn-outline-primary');
                 $(this).removeClass('btn-outline-primary').addClass('btn-primary active');
                 window._activeOrgId = $(this).data('org-id') || null;
+                localStorage.setItem('legal_acts_active_org_id', window._activeOrgId || '');
                 table.ajax.reload();
             });
 
@@ -728,12 +743,13 @@
                 $('#filter_legal_act_number,#filter_summary,#filter_task_number').val('');
                 $('#filter_act_type,#filter_issued_by,#filter_executor,#filter_deadline_status,#filter_department').val(null).trigger('change');
                 fpDate.clear(); fpDead.clear();
-                // Re-activate first org tab
+                // Re-activate first org tab and clear stored selection
                 var $tabs = $('#orgTabBar .org-tab');
                 if ($tabs.length) {
                     $tabs.removeClass('active btn-primary').addClass('btn-outline-primary');
                     $tabs.first().removeClass('btn-outline-primary').addClass('btn-primary active');
                     window._activeOrgId = $tabs.first().data('org-id') || null;
+                    localStorage.setItem('legal_acts_active_org_id', window._activeOrgId || '');
                 }
                 table.ajax.reload();
             });
