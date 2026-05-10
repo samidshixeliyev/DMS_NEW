@@ -463,9 +463,10 @@ class LegalActController extends Controller
         }
 
         // Filter executor lists: only executors whose dept is in the viewer's subtree.
+        // Always include the viewer's own executor record so executor-role users see themselves.
         if ($viewerTabDeptIds !== null) {
-            $mainExecutors   = $mainExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds))->values();
-            $helperExecutors = $helperExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds))->values();
+            $mainExecutors   = $mainExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds) || $e->id === $user->executor_id)->values();
+            $helperExecutors = $helperExecutors->filter(fn($e) => in_array((int) $e->department_id, $viewerTabDeptIds) || $e->id === $user->executor_id)->values();
         }
 
         // All remaining executors are in scope — expose their private task descriptions.
@@ -480,8 +481,10 @@ class LegalActController extends Controller
         };
 
         // Collect filtered executor IDs and scope status_logs to the same set.
+        // Always include the viewer's own executor_id so executor-role users always see their own logs.
         $allowedExecutorIds = $mainExecutors->pluck('id')
             ->merge($helperExecutors->pluck('id'))
+            ->merge($user->executor_id ? [$user->executor_id] : [])
             ->unique()
             ->toArray();
 
@@ -540,6 +543,11 @@ class LegalActController extends Controller
                 if (!in_array((int) $legalAct->organization_id, $allowedOrgIds)) {
                     abort(403);
                 }
+            } elseif (!$user->isAdmin()) {
+                // Manager without can_assign ancestry can only edit acts they created
+                if (auth()->id() !== $legalAct->inserted_user_id) {
+                    abort(403);
+                }
             }
         } elseif (auth()->id() !== $legalAct->inserted_user_id) {
             abort(403);
@@ -593,7 +601,17 @@ class LegalActController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->canManage() && auth()->id() !== $legalAct->inserted_user_id) {
+        if ($user->canManage()) {
+            $assignDeptId = $user->canAssignDeptId();
+            if ($assignDeptId) {
+                $allowedOrgIds = Department::descendantIdsOf($assignDeptId);
+                if (!in_array((int) $legalAct->organization_id, $allowedOrgIds)) {
+                    abort(403, 'Sizin bu əməliyyat üçün icazəniz yoxdur.');
+                }
+            } elseif (!$user->isAdmin() && auth()->id() !== $legalAct->inserted_user_id) {
+                abort(403, 'Sizin bu əməliyyat üçün icazəniz yoxdur.');
+            }
+        } elseif (auth()->id() !== $legalAct->inserted_user_id) {
             abort(403, 'Sizin bu əməliyyat üçün icazəniz yoxdur.');
         }
 

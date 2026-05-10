@@ -583,6 +583,21 @@
                         <span style="width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
                         {{ auth()->user()->user_role === 'admin' ? 'Admin' : (auth()->user()->user_role === 'manager' ? 'Menecer' : 'İstifadəçi') }}
                     </span>
+                    @php
+                        $sidebarDeptName = null;
+                        $sidebarUser = auth()->user();
+                        if ($sidebarUser->user_role !== 'admin') {
+                            $sidebarDeptId = $sidebarUser->effectiveDeptId();
+                            if ($sidebarDeptId) {
+                                $sidebarDeptName = \App\Models\Department::find($sidebarDeptId)?->name;
+                            }
+                        }
+                    @endphp
+                    @if($sidebarDeptName)
+                        <div style="font-size:0.67rem; color:rgba(255,255,255,0.45); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ $sidebarDeptName }}">
+                            <i class="bi bi-building" style="font-size:0.6rem;"></i> {{ $sidebarDeptName }}
+                        </div>
+                    @endif
                 </div>
             </div>
 

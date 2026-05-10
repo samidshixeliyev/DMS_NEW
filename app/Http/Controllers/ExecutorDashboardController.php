@@ -81,8 +81,8 @@ class ExecutorDashboardController extends Controller
         $user       = auth()->user();
         $executorId = $user->executor_id;
 
-        // Admin/manager viewing as a specific executor
-        if ($user->canManage() && $request->filled('view_as_executor_id')) {
+        // Only admin may view as a specific executor
+        if ($user->isAdmin() && $request->filled('view_as_executor_id')) {
             $executorId = (int) $request->input('view_as_executor_id');
         }
 
@@ -286,6 +286,26 @@ class ExecutorDashboardController extends Controller
             $myTaskDescription = $legalAct->task_description;
         }
 
+        // Scope status logs to the viewer's own dept subtree (issue 5):
+        // Admin sees all logs; everyone else sees only logs from executors in their subtree.
+        $viewerDeptIds = null;
+        if (!$user->isAdmin() && $user->effectiveDeptId()) {
+            $viewerDeptIds = Department::descendantIdsOf($user->effectiveDeptId());
+        }
+
+        $visibleLogs = $viewerDeptIds === null
+            ? $legalAct->statusLogs
+            : $legalAct->statusLogs->filter(function ($log) use ($viewerDeptIds, $user) {
+                // Always include own logs
+                if ($log->user_id === $user->id) return true;
+                // Include logs from users whose executor is in viewer's subtree
+                $execDeptId = $log->user?->executor?->department_id;
+                if ($execDeptId && in_array((int) $execDeptId, $viewerDeptIds)) return true;
+                // Include logs from users whose own department is in viewer's subtree
+                $userDeptId = $log->user?->department_id;
+                return $userDeptId && in_array((int) $userDeptId, $viewerDeptIds);
+            });
+
         return response()->json([
             'id'                  => $legalAct->id,
             'act_type'            => $legalAct->actType?->name,
@@ -309,7 +329,7 @@ class ExecutorDashboardController extends Controller
             'inserted_user'            => $legalAct->insertedUser?->full_name,
             'inserted_user_department' => $legalAct->insertedUser?->department?->name,
             'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
-            'status_logs'         => $legalAct->statusLogs->map(fn($log) => [
+            'status_logs'         => $visibleLogs->map(fn($log) => [
                 'id'              => $log->id,
                 'user'            => $log->user?->full_name,
                 // Prefer the executor record's department (authoritative for executor-role users),
@@ -671,8 +691,8 @@ class ExecutorDashboardController extends Controller
         $user       = auth()->user();
         $executorId = $user->executor_id;
 
-        // Admin/manager viewing as specific executor
-        if ($user->canManage() && $request->filled('view_as_executor_id')) {
+        // Only admin may view as specific executor
+        if ($user->isAdmin() && $request->filled('view_as_executor_id')) {
             $executorId = (int) $request->input('view_as_executor_id');
         }
 

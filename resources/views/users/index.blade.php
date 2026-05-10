@@ -48,7 +48,7 @@
                             <th style="background:#1e3a5f;color:#fff;">E-poçt</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Rol</th>
                             <th style="background:#1e3a5f;color:#fff;">Rəhbər icraçı</th>
-                            <th style="background:#1e3a5f;color:#fff;">Şöbə</th>
+                            <th style="background:#1e3a5f;color:#fff;">İdarə</th>
                             <th style="background:#374151;color:#fff;text-align:center;width:130px;">Əməliyyat</th>
                         </tr>
                     </thead>
@@ -128,9 +128,10 @@
                             </div>
                             <div class="col-12">
                                 <label class="form-label">
-                                    Şöbə
+                                    İdarə
                                     <span class="text-danger dept-required-create" style="display:{{ old('user_role') === 'manager' ? 'inline' : 'none' }};"> *</span>
                                     <small class="text-muted dept-hint-create" style="display:{{ old('user_role') === 'manager' ? 'none' : 'inline' }};">(ixtiyari)</small>
+                                    <small class="text-info dept-locked-create" style="display:none;"><i class="bi bi-lock-fill me-1"></i>Rəhbər icraçıdan avtomatik</small>
                                 </label>
                                 <select name="department_id" id="create_department_id" class="form-select"
                                     {{ old('user_role') === 'manager' ? 'required' : '' }}>
@@ -213,9 +214,10 @@
                             </div>
                             <div class="col-12">
                                 <label class="form-label">
-                                    Şöbə
+                                    İdarə
                                     <span class="text-danger dept-required-edit" style="display:none;"> *</span>
                                     <small class="text-muted dept-hint-edit">(ixtiyari)</small>
+                                    <small class="text-info dept-locked-edit" style="display:none;"><i class="bi bi-lock-fill me-1"></i>Rəhbər icraçıdan avtomatik</small>
                                 </label>
                                 <select name="department_id" id="edit_department_id" class="form-select">
                                     <option value="">Seç</option>
@@ -350,11 +352,13 @@
                 document.getElementById('create_username_feedback').textContent = '';
                 document.getElementById('create_username').classList.remove('is-invalid');
                 document.getElementById('create_dept_head_warning').style.display = 'none';
+                lockDeptForExecutor('create', null);
             });
             document.getElementById('editModal').addEventListener('hidden.bs.modal', function () {
                 document.getElementById('edit_username_feedback').textContent = '';
                 document.getElementById('edit_username').classList.remove('is-invalid');
                 document.getElementById('edit_dept_head_warning').style.display = 'none';
+                lockDeptForExecutor('edit', null);
             });
 
             // Department head check — live AJAX warning
@@ -393,27 +397,62 @@
                 checkDeptHead('edit', excludeId);
             });
 
+            function lockDeptForExecutor(prefix, deptId) {
+                var $deptSelect = $('#' + prefix + '_department_id');
+                var $lockedNote = $('.dept-locked-' + prefix);
+                var $hint = $('.dept-hint-' + prefix);
+                var hiddenId = prefix + '_dept_hidden';
+                if (deptId) {
+                    $deptSelect.val(deptId);
+                    if ($deptSelect.data('select2')) $deptSelect.trigger('change.select2');
+                    // Add hidden input so the locked value is still submitted when select is disabled
+                    $('#' + hiddenId).remove();
+                    $deptSelect.after('<input type="hidden" id="' + hiddenId + '" name="department_id" value="' + deptId + '">');
+                    $deptSelect.prop('disabled', true);
+                    $lockedNote.show();
+                    $hint.hide();
+                } else {
+                    $deptSelect.prop('disabled', false);
+                    $('#' + hiddenId).remove();
+                    $lockedNote.hide();
+                    $hint.show();
+                }
+            }
+
             $(document).on('change', 'select[name="executor_id"]', function () {
-                var $opt = $(this).find(':selected');
                 var $form = $(this).closest('form');
                 var executorId = $(this).val();
-                if (!executorId) return;
-
                 var prefix = $form.attr('id') === 'editForm' ? 'edit' : 'create';
+
+                if (!executorId) {
+                    lockDeptForExecutor(prefix, null);
+                    return;
+                }
+
+                var deptId = null;
                 if (prefix === 'edit') {
-                    var deptId = null;
-                    var select = document.getElementById('edit_executor_id');
-                    var execData = select._execData || [];
+                    var execData = document.getElementById('edit_executor_id')._execData || [];
                     execData.forEach(function (e) {
                         if (e.id == executorId && e.department) deptId = e.department.id;
                     });
-                    if (deptId) $('#edit_department_id').val(deptId).trigger('change');
                 } else {
                     @json($executors).forEach(function (e) {
-                        if (e.id == executorId && e.department) {
-                            $form.find('select[name="department_id"]').val(e.department.id).trigger('change');
-                        }
+                        if (e.id == executorId && e.department) deptId = e.department.id;
                     });
+                }
+                lockDeptForExecutor(prefix, deptId);
+            });
+
+            // Re-apply lock state when edit modal is opened (executor already selected)
+            $(document).on('shown.bs.modal', '#editModal', function () {
+                var execId = $('#edit_executor_id').val();
+                if (execId) {
+                    var execData = document.getElementById('edit_executor_id')._execData || [];
+                    var deptId = null;
+                    execData.forEach(function (e) {
+                        if (e.id == execId && e.department) deptId = e.department.id;
+                    });
+                    lockDeptForExecutor('edit', deptId);
                 }
             });
         });
@@ -476,7 +515,7 @@
                 <tr><th>Rol</th><td>${escapeHtml(roleLabels[data.user_role] || data.user_role)}</td></tr>
                 <tr><th>Rəhbər icraçı</th><td>${escapeHtml(data.executor_name || '-')}</td></tr>
                 <tr><th>Rəhbər icraçı idarəsi</th><td>${escapeHtml(data.executor_department || '-')}</td></tr>
-                <tr><th>Şöbə</th><td>${escapeHtml(data.department_name || '-')}</td></tr>
+                <tr><th>İdarə</th><td>${escapeHtml(data.department_name || '-')}</td></tr>
                 <tr><th>Yaradılma tarixi</th><td>${escapeHtml(data.created_at || '-')}</td></tr>
             </table>
         `;

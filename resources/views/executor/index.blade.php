@@ -189,7 +189,7 @@
                 class="btn-close" data-bs-dismiss="alert"></button>
     </div>@endif
 
-    @if(auth()->user()->canManage() && $allExecutors->isNotEmpty())
+    @if(auth()->user()->isAdmin() && $allExecutors->isNotEmpty())
         <div class="card mb-3">
             <div class="card-body py-2">
                 <div class="row align-items-center">
@@ -357,7 +357,11 @@
 
             // ─── Org tab state ───────────────────────────────────────────
             @if($visibleOrgs->count() > 1)
-            window._activeOrgId = {{ $visibleOrgs->first()->id }};
+            var _storedOrgId = localStorage.getItem('executor_active_org_id');
+            var _validOrgIds = {!! $visibleOrgs->pluck('id')->toJson() !!};
+            window._activeOrgId = (_storedOrgId && _validOrgIds.includes(parseInt(_storedOrgId)))
+                ? parseInt(_storedOrgId)
+                : {{ $visibleOrgs->first()->id }};
             @else
             window._activeOrgId = null;
             @endif
@@ -459,11 +463,21 @@
             $('#viewAsExecutor').on('change.orgCounts', loadOrgCounts);
             @endif
 
+            // ─── Restore active tab highlight after page load ────────────
+            @if($visibleOrgs->count() > 1)
+            if (window._activeOrgId) {
+                $('#orgTabBar .org-tab').removeClass('active btn-primary').addClass('btn-outline-primary');
+                $('#orgTabBar .org-tab[data-org-id="' + window._activeOrgId + '"]')
+                    .removeClass('btn-outline-primary').addClass('btn-primary active');
+            }
+            @endif
+
             // ─── Org tab switching ───────────────────────────────────────
             $('#orgTabBar').on('click', '.org-tab', function () {
                 $('#orgTabBar .org-tab').removeClass('active btn-primary').addClass('btn-outline-primary');
                 $(this).removeClass('btn-outline-primary').addClass('btn-primary active');
                 window._activeOrgId = $(this).data('org-id') || null;
+                localStorage.setItem('executor_active_org_id', window._activeOrgId || '');
                 table.ajax.reload();
             });
 

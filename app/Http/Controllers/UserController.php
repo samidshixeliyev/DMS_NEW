@@ -126,6 +126,20 @@ class UserController extends Controller
             $validated['executor_id'] = null;
         }
 
+        // Department must match the selected executor's department
+        if (!empty($validated['executor_id']) && !empty($validated['department_id'])) {
+            $executor = Executor::find($validated['executor_id']);
+            if ($executor && $executor->department_id && (int) $validated['department_id'] !== (int) $executor->department_id) {
+                return back()->withInput()->withErrors([
+                    'department_id' => 'İdarə, seçilmiş rəhbər icraçının idarəsi ilə uyğun olmalıdır.',
+                ]);
+            }
+            // Auto-assign the executor's department if none given
+            if ($executor && $executor->department_id && empty($validated['department_id'])) {
+                $validated['department_id'] = $executor->department_id;
+            }
+        }
+
         if ($validated['user_role'] === 'manager' && !empty($validated['department_id'])) {
             $existing = User::where('user_role', 'manager')
                 ->where('department_id', (int) $validated['department_id'])
@@ -203,6 +217,16 @@ class UserController extends Controller
         // executor_id is only meaningful for executor and manager roles
         if (!in_array($validated['user_role'], ['executor', 'manager'])) {
             $validated['executor_id'] = null;
+        }
+
+        // Department must match the selected executor's department
+        if (!empty($validated['executor_id']) && !empty($validated['department_id'])) {
+            $executor = Executor::find($validated['executor_id']);
+            if ($executor && $executor->department_id && (int) $validated['department_id'] !== (int) $executor->department_id) {
+                return back()->withInput()->withErrors([
+                    'department_id' => 'İdarə, seçilmiş rəhbər icraçının idarəsi ilə uyğun olmalıdır.',
+                ])->with('edit_user_id', $user->id);
+            }
         }
 
         if ($validated['user_role'] === 'manager' && !empty($validated['department_id'])) {

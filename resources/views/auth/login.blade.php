@@ -303,6 +303,9 @@
 
     <div class="login-footer">
         &copy; {{ date('Y') }} DMS &mdash; Document Management System
+        <div style="margin-top:0.4rem; font-size:0.72rem; color:rgba(255,255,255,0.4);">
+            Problemlər üçün müraciət edin: <strong style="color:rgba(255,255,255,0.6);">10-195</strong>
+        </div>
     </div>
 </div>
 
