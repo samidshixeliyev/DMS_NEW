@@ -119,7 +119,8 @@ class UserController extends Controller
                 : 'nullable|exists:departments,id',
         ]);
 
-        $validated['password'] = Hash::make($validated['password']);
+        $validated['password']              = Hash::make($validated['password']);
+        $validated['force_password_change'] = true; // user must change password on first login
 
         // executor_id is only meaningful for executor and manager roles
         if (!in_array($validated['user_role'], ['executor', 'manager'])) {
@@ -137,18 +138,6 @@ class UserController extends Controller
             // Auto-assign the executor's department if none given
             if ($executor && $executor->department_id && empty($validated['department_id'])) {
                 $validated['department_id'] = $executor->department_id;
-            }
-        }
-
-        if ($validated['user_role'] === 'manager' && !empty($validated['department_id'])) {
-            $existing = User::where('user_role', 'manager')
-                ->where('department_id', (int) $validated['department_id'])
-                ->where('is_deleted', false)
-                ->first();
-            if ($existing) {
-                return back()->withInput()->withErrors([
-                    'department_id' => "Bu şöbənin artıq aktiv rəhbəri var: {$existing->name} {$existing->surname}. Əvvəlcə mövcud rəhbəri başqa şöbəyə köçürün.",
-                ]);
             }
         }
 
@@ -229,19 +218,6 @@ class UserController extends Controller
             }
         }
 
-        if ($validated['user_role'] === 'manager' && !empty($validated['department_id'])) {
-            $existing = User::where('user_role', 'manager')
-                ->where('department_id', (int) $validated['department_id'])
-                ->where('is_deleted', false)
-                ->where('id', '!=', $user->id)
-                ->first();
-            if ($existing) {
-                return back()->withInput()->withErrors([
-                    'department_id' => "Bu şöbənin artıq aktiv rəhbəri var: {$existing->name} {$existing->surname}. Əvvəlcə mövcud rəhbəri başqa şöbəyə köçürün.",
-                ])->with('edit_user_id', $user->id);
-            }
-        }
-
         $user->update($validated);
 
         return redirect()->route('users.index')->with('success', 'İstifadəçi uğurla yeniləndi.');
@@ -256,6 +232,32 @@ class UserController extends Controller
         $user->update(['is_deleted' => true]);
 
         return redirect()->route('users.index')->with('success', 'İstifadəçi uğurla silindi.');
+    }
+
+    /**
+     * First-login forced password change (no current-password check required).
+     */
+    public function forceChangePassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ], [
+            'password.required'  => 'Yeni şifrə mütləqdir.',
+            'password.min'       => 'Şifrə ən azı 6 simvol olmalıdır.',
+            'password.confirmed' => 'Şifrə təkrarı uyğun gəlmir.',
+        ]);
+
+        $user = auth()->user();
+        $user->update([
+            'password'             => \Illuminate\Support\Facades\Hash::make($request->password),
+            'force_password_change' => false,
+        ]);
+
+        return redirect()->intended(
+            $user->user_role === 'executor'
+                ? route('executor.index')
+                : route('legal-acts.index')
+        )->with('success', 'Şifrəniz uğurla dəyişdirildi. Xoş gəlmisiniz!');
     }
 
     public function changePassword(Request $request)
@@ -276,7 +278,10 @@ class UserController extends Controller
             return back()->withErrors(['current_password' => 'Cari şifrə yanlışdır.']);
         }
 
-        $user->update(['password' => Hash::make($validated['password'])]);
+        $user->update([
+            'password'             => Hash::make($validated['password']),
+            'force_password_change' => false,
+        ]);
 
         return back()->with('success', 'Şifrəniz uğurla dəyişdirildi.');
     }

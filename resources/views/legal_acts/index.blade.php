@@ -67,15 +67,15 @@
         }
 
         #legalActsTable thead tr.band-header th {
-            font-size: 0.82rem;
-            padding: 0.6rem;
-            letter-spacing: 0.3px;
+            font-size: 0.76rem;
+            padding: 0.28rem 0.35rem;
+            letter-spacing: 0.2px;
         }
 
         #legalActsTable thead tr.sub-header th {
-            font-size: 0.74rem;
+            font-size: 0.71rem;
             font-weight: 600;
-            padding: 0.5rem 0.45rem;
+            padding: 0.25rem 0.3rem;
         }
 
         th.bg-band-doc,
@@ -92,22 +92,58 @@
         }
 
         #legalActsTable {
-            min-width: 1800px;
+            min-width: 780px;
+            table-layout: fixed;
+            width: 100% !important;
         }
 
         #legalActsTable tbody td {
-            font-size: 0.82rem;
-            padding: 0.5rem 0.65rem;
+            font-size: 0.78rem;
+            padding: 0.22rem 0.28rem;
             vertical-align: middle;
             text-align: center;
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: normal;
+            line-height: 1.3;
         }
 
+        /* Stretch: Qısa Məzmun + Tapşırıq — allow char-level break for long strings */
         #legalActsTable tbody td.wrap-cell {
             white-space: normal;
             word-break: break-word;
+            overflow-wrap: break-word;
             text-align: left;
-            min-width: 120px;
-            max-width: 230px;
+            font-size: 0.79rem;
+        }
+
+        /* Dense: people / org / status — wrap at word boundaries only */
+        #legalActsTable tbody td.col-person {
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: normal;
+            text-align: center;
+        }
+
+        /* Dense: date columns — nowrap so "20.05.2026" fits on one line */
+        #legalActsTable tbody td.col-date {
+            white-space: nowrap;
+            font-size: 0.74rem;
+        }
+
+        /* Badges inside table rows — slightly above cell text */
+        #legalActsTable .badge {
+            font-size: 0.75rem;
+            padding: 0.2em 0.45em;
+            line-height: 1.3;
+        }
+
+        /* Force actions column to its colgroup width — DataTables tends to override */
+        #legalActsTable th:last-child,
+        #legalActsTable td:last-child {
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
         }
 
         #legalActsTable tbody tr:nth-child(even):not([class*="row-"]) {
@@ -142,14 +178,14 @@
         .action-btns {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
             justify-content: center;
             align-items: center;
         }
 
         .action-btns .btn {
-            width: 32px;
-            height: 32px;
+            width: 26px;
+            height: 26px;
             padding: 0;
             display: inline-flex;
             align-items: center;
@@ -315,11 +351,11 @@
                     <div class="col-xl-2 col-md-3"><label class="form-label">Müddət statusu</label><select
                             id="filter_deadline_status" class="form-select filter-select">
                             <option value="">Hamısı</option>
-                            <option value="overdue">Vaxtı keçib</option>
+                            <option value="overdue">İcra müddəti bitib</option>
                             <option value="due_soon">3 gün qalıb</option>
                             <option value="executed">İcra olunub</option>
                         </select></div>
-                    <div class="col-xl-2 col-md-3"><label class="form-label">Tapşırıq №</label><input type="text"
+                    <div class="col-xl-2 col-md-3"><label class="form-label">Qeyd</label><input type="text"
                             id="filter_task_number" class="form-control filter-el" placeholder="Axtar..."></div>
                     <div class="col-xl-2 col-md-3"><label class="form-label">Bölmə</label><select id="filter_department"
                             class="form-select filter-select">
@@ -350,10 +386,23 @@
         <div class="card-body p-0">
             <div style="overflow-x:auto;">
                 <table class="table table-hover table-bordered mb-0" id="legalActsTable" style="width:100%">
+                    <colgroup>
+                        <col style="width:100px">    {{-- actType --}}
+                        <col style="width:90px">    {{-- legalActNumber --}}
+                        <col style="width:100px">    {{-- legalActDate --}}
+                        <col style="width:120px">    {{-- issuingAuthority --}}
+                        <col>                       {{-- summary (Qısa Məzmun) — stretch --}}
+                        <col>                       {{-- taskDescription — stretch --}}
+                        <col style="width:170px">   {{-- executor --}}
+                        <col style="width:170px">   {{-- department --}}
+                        <col style="width:130px">    {{-- deadlineHtml --}}
+                        <col style="width:160px">   {{-- noteHtml --}}
+                        <col style="width:36px">    {{-- actions --}}
+                    </colgroup>
                     <thead>
                         <tr class="band-header">
-                            <th colspan="6" class="bg-band-doc">Sənəd Məlumatları</th>
-                            <th colspan="2" class="bg-band-task">Tapşırıq</th>
+                            <th colspan="5" class="bg-band-doc">Sənəd Məlumatları</th>
+                            <th colspan="1" class="bg-band-task">Tapşırıq</th>
                             <th colspan="4" class="bg-band-exec">İcraçı Məlumatları</th>
                             <th rowspan="2" class="bg-band-actions" style="position:sticky;right:0;z-index:4;"></th>
                         </tr>
@@ -362,9 +411,7 @@
                             <th class="bg-band-doc-sub">Nömrəsi</th>
                             <th class="bg-band-doc-sub">Tarixi</th>
                             <th class="bg-band-doc-sub">Kim Qəbul Edib</th>
-                            <th class="bg-band-doc-sub">Sənədin sahibi</th>
                             <th class="bg-band-doc-sub">Qısa Məzmun</th>
-                            <th class="bg-band-task-sub">Tapşırıq №</th>
                             <th class="bg-band-task-sub">Tapşırıq</th>
                             <th class="bg-band-exec-sub">İcraçı</th>
                             <th class="bg-band-exec-sub">Bölmə</th>
@@ -466,8 +513,8 @@
                                     value="{{ old('execution_deadline') }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Tapşırıq №</label>
-                                <input type="text" name="task_number" class="form-control" value="{{ old('task_number') }}">
+                                <label class="form-label">Qeyd</label>
+                                <textarea name="task_number" class="form-control" rows="2" maxlength="2000">{{ old('task_number') }}</textarea>
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Qısa məzmun <span class="text-danger">*</span></label>
@@ -675,18 +722,16 @@
                     data: function (d) { var f = gfp(); d.col = {}; Object.keys(f).forEach(function (k) { var m = k.match(/^col\[(.+)\]$/); if (m) d.col[m[1]] = f[k]; }); }
                 },
                 columns: [
-                    { data: 'actType', className: 'text-center', width: '80px', render: function (d) { return (!d || d === '-') ? '-' : '<span class="badge" style="background:var(--accent-dark,#1e3a5f)">' + escapeHtml(d) + '</span>'; } },
-                    { data: 'legalActNumber', className: 'fw-semibold text-center' },
-                    { data: 'legalActDate', className: 'text-center', width: '85px' },
-                    { data: 'issuingAuthority' },
-                    { data: 'insertedUser', className: 'text-center' },
-                    { data: 'summary', className: 'wrap-cell' },
-                    { data: 'taskNumber', className: 'text-center' },
-                    { data: 'taskDescription', className: 'wrap-cell' },
-                    { data: 'executor' },
-                    { data: 'department' },
-                    { data: 'deadlineHtml', className: 'text-center' },
-                    { data: 'noteHtml', },
+                    { data: 'actType',          className: 'text-center', render: function (d) { return (!d || d === '-') ? '-' : '<span class="badge" style="background:var(--accent-dark,#1e3a5f);font-size:0.75rem;white-space:normal;line-height:1.2">' + escapeHtml(d) + '</span>'; } },
+                    { data: 'legalActNumber',   className: 'fw-semibold text-center' },
+                    { data: 'legalActDate',     className: 'text-center col-date' },
+                    { data: 'issuingAuthority', className: 'col-person' },
+                    { data: 'summary',          className: 'wrap-cell' },
+                    { data: 'taskDescription',  className: 'wrap-cell' },
+                    { data: 'executor',         className: 'col-person' },
+                    { data: 'department',       className: 'col-person' },
+                    { data: 'deadlineHtml',     className: 'text-center col-date' },
+                    { data: 'noteHtml',         className: 'col-person' },
 
                     {
                         data: null, orderable: false, searchable: false, render: function (d) {
@@ -700,7 +745,7 @@
                         }
                     }
                 ],
-                order: [[0, 'desc']], pageLength: 25, lengthMenu: [10, 25, 50, 100], autoWidth: false, orderCellsTop: true,
+                order: [[0, 'desc']], pageLength: 25, lengthMenu: [10, 25, 50, 100], autoWidth: false,
                 dom: '<"d-flex justify-content-between align-items-center flex-wrap px-3 pt-2"lB>rt<"d-flex justify-content-between align-items-center flex-wrap px-3 pb-2"ip>',
                 buttons: [
                     { extend: 'colvis', text: '<i class="bi bi-eye me-1"></i> Sütunlar', className: 'btn btn-secondary btn-sm', columns: ':not(:last-child)' },
@@ -873,8 +918,8 @@
                     if (ei > 0) h += '<hr class="my-2" style="opacity:0.15">';
                     var userLogs = logsByExec[ex.id] || [];
                     var roleBadge = ex.role === 'Əsas'
-                        ? '<span class="badge bg-success" style="font-size:0.6rem">Əsas</span>'
-                        : '<span class="badge bg-secondary" style="font-size:0.6rem">Digər</span>';
+                        ? '<span class="badge bg-success" style="font-size:0.75rem">Əsas</span>'
+                        : '<span class="badge bg-secondary" style="font-size:0.75rem">Digər</span>';
 
                     h += '<div class="mb-1"><strong style="font-size:0.85rem">' + escapeHtml(ex.name) + '</strong> ' + roleBadge + '</div>';
 
@@ -931,14 +976,15 @@
                 + '<tr><th>Tarix</th><td>' + escapeHtml(data.legal_act_date || '-') + '</td></tr>'
                 + '<tr><th>Kim qəbul edib</th><td>' + escapeHtml(data.issuing_authority || '-') + '</td></tr>'
                 + '<tr><th>Qısa məzmun</th><td style="white-space:pre-wrap">' + escapeHtml(data.summary || '-') + '</td></tr>'
-                + '<tr><th>Tapşırıq №</th><td>' + escapeHtml(data.task_number || '-') + '</td></tr>'
+                + (data.task_number ? '<tr><th>Qeyd</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_number) + '</td></tr>' : '')
                 + '<tr><th>Ümumi tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_description || '-') + '</td></tr>'
                 + '<tr><th>İcra müddəti</th><td>' + escapeHtml(data.execution_deadline || '-') + '</td></tr>'
                 + '<tr><th>Əlaqəli sənəd</th><td>' + escapeHtml(data.related_document_number || '-') + '</td></tr>'
-                + '<tr><th>Daxil edən</th><td>' + escapeHtml(data.inserted_user || '-') + '</td></tr>'
                 + '<tr><th>Yaradılma</th><td>' + escapeHtml(data.created_at || '-') + '</td></tr>'
                 + '<tr><th>Sübut sənəd</th><td>' + (data.proof_required ? '<span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Məcburidir</span>' : '<span class="badge bg-secondary">İxtiyari</span>') + '</td></tr>'
-                + '</table></div>'
+                + '</table>'
+                + (data.attachments && data.attachments.length ? '<div class="mt-3"><h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-1"></i>Tapşırıq Sənədləri</h6>' + buildAttachmentHtml(data.attachments) + '</div>' : '')
+                + '</div>'
                 + '<div class="col-lg-5"><h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i> İcraçılar və Status</h6>' + rightHtml + '</div>'
                 + '</div>';
 
@@ -1004,7 +1050,7 @@
             h += '</div></div>';
 
             h += '<div class="col-md-6"><label class="form-label">İcra müddəti</label><input type="text" name="execution_deadline" class="form-control edit-datepicker" value="' + escapeHtml(data.execution_deadline || '') + '"></div>';
-            h += '<div class="col-md-6"><label class="form-label">Tapşırıq №</label><input type="text" name="task_number" class="form-control" value="' + escapeHtml(data.task_number || '') + '"></div>';
+            h += '<div class="col-md-6"><label class="form-label">Qeyd</label><textarea name="task_number" class="form-control" rows="2" maxlength="2000">' + escapeHtml(data.task_number || '') + '</textarea></div>';
             h += '<div class="col-12"><label class="form-label">Qısa məzmun *</label><textarea name="summary" class="form-control" rows="3" required>' + escapeHtml(data.summary || '') + '</textarea></div>';
             h += '<div class="col-12"><label class="form-label">Tapşırıq</label><textarea name="task_description" class="form-control" rows="2">' + escapeHtml(data.task_description || '') + '</textarea></div>';
             h += '<div class="col-md-6"><label class="form-label">Əlaqəli sənəd №</label><input type="text" name="related_document_number" class="form-control" value="' + escapeHtml(data.related_document_number || '') + '"></div>';
@@ -1013,6 +1059,7 @@
             h += '<input class="form-check-input" type="checkbox" name="proof_required" id="edit_proof_required" value="1"' + (data.proof_required ? ' checked' : '') + '>';
             h += '<label class="form-check-label" for="edit_proof_required"><i class="bi bi-shield-lock me-1"></i> Sübut sənəd məcburidir</label>';
             h += '</div></div>';
+
             h += '</div>';
 
             document.getElementById('editModalBody').innerHTML = h;

@@ -755,6 +755,16 @@
                         </a>
                         <span class="sidebar-tooltip">Aktivlik Jurnalı</span>
                     </div>
+
+                    <div class="nav-item-wrapper" style="margin-bottom:2px;">
+                        <a href="{{ route('announcements.index') }}"
+                            class="nav-link-inner {{ request()->routeIs('announcements.*') ? 'sidebar-nav-active' : '' }}"
+                            style="display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.75rem; border-radius:8px; font-size:0.82rem; font-weight:500; color:rgba(255,255,255,0.7); text-decoration:none; transition:all 0.2s; border-left:3px solid transparent;">
+                            <i class="bi bi-megaphone" style="font-size:1rem; width:20px; text-align:center;"></i>
+                            <span class="sidebar-text">Elanlar</span>
+                        </a>
+                        <span class="sidebar-tooltip">Elanlar</span>
+                    </div>
                 @endif
 
             </nav>
@@ -806,6 +816,103 @@
 
             <main style="flex:1; overflow:auto; padding:1.25rem;">
                 <div class="container-fluid" style="max-width:100%; padding:0;">
+                    {{-- ─── Sliding Announcements Ticker ────────────────────────────── --}}
+                    @php
+                        $activeAnnouncements = \Illuminate\Support\Facades\Cache::remember(
+                            'active_announcements', 120,
+                            fn() => \App\Models\Announcement::active()->orderByDesc('created_at')->get()
+                        );
+                    @endphp
+                    @if($activeAnnouncements->isNotEmpty())
+                    <div id="announcementTicker" style="
+                        display:flex; align-items:stretch;
+                        background: linear-gradient(90deg, #1e3a5f 0%, #2a5298 100%);
+                        border-radius:10px; margin-bottom:0.9rem;
+                        overflow:hidden; box-shadow:0 2px 8px rgba(30,58,95,0.18);
+                        min-height:40px; position:relative;">
+
+                        {{-- Label badge --}}
+                        <div style="
+                            display:flex; align-items:center; gap:6px;
+                            background:rgba(0,180,216,0.18); border-right:1px solid rgba(255,255,255,0.15);
+                            padding:0 14px; flex-shrink:0; white-space:nowrap;">
+                            <i class="bi bi-megaphone-fill" style="color:#ffd166;font-size:0.95rem;"></i>
+                            <span style="color:#ffd166;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;">ELAN</span>
+                        </div>
+
+                        {{-- Scrolling track --}}
+                        <div style="flex:1; overflow:hidden; position:relative; display:flex; align-items:center;">
+                            <div id="tickerTrack" style="
+                                display:flex; align-items:center;
+                                white-space:nowrap;
+                                animation: tickerScroll linear infinite;
+                                animation-duration: {{ max(12, $activeAnnouncements->count() * 12) }}s;
+                                padding-left:100%;">
+                                @foreach($activeAnnouncements as $ann)
+                                    <span style="
+                                        display:inline-flex; align-items:center; gap:6px;
+                                        color:#fff; font-size:0.83rem; font-weight:500;
+                                        margin-right:60px;">
+                                        <span style="
+                                            background:rgba(255,209,102,0.18);
+                                            border:1px solid rgba(255,209,102,0.35);
+                                            color:#ffd166; border-radius:4px;
+                                            padding:1px 7px; font-size:0.72rem; font-weight:700;
+                                            margin-right:4px; white-space:nowrap;">
+                                            {{ $ann->title }}
+                                        </span>
+                                        {{ $ann->message }}
+                                    </span>
+                                    @if(!$loop->last)
+                                        <span style="color:rgba(255,255,255,0.3); margin-right:60px; font-size:1.1rem;">◆</span>
+                                    @endif
+                                @endforeach
+                                {{-- Duplicate for seamless loop --}}
+                                @foreach($activeAnnouncements as $ann)
+                                    <span style="
+                                        display:inline-flex; align-items:center; gap:6px;
+                                        color:#fff; font-size:0.83rem; font-weight:500;
+                                        margin-right:60px;">
+                                        <span style="
+                                            background:rgba(255,209,102,0.18);
+                                            border:1px solid rgba(255,209,102,0.35);
+                                            color:#ffd166; border-radius:4px;
+                                            padding:1px 7px; font-size:0.72rem; font-weight:700;
+                                            margin-right:4px; white-space:nowrap;">
+                                            {{ $ann->title }}
+                                        </span>
+                                        {{ $ann->message }}
+                                    </span>
+                                    @if(!$loop->last)
+                                        <span style="color:rgba(255,255,255,0.3); margin-right:60px; font-size:1.1rem;">◆</span>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+
+                        {{-- Close button --}}
+                        <button onclick="document.getElementById('announcementTicker').style.display='none'"
+                            style="
+                                background:none; border:none; color:rgba(255,255,255,0.55);
+                                cursor:pointer; padding:0 12px; flex-shrink:0;
+                                font-size:1.1rem; line-height:1; transition:color 0.2s;
+                                display:flex; align-items:center;"
+                            onmouseover="this.style.color='#fff'"
+                            onmouseout="this.style.color='rgba(255,255,255,0.55)'"
+                            title="Bağla">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+
+                    <style>
+                    @keyframes tickerScroll {
+                        0%   { transform: translateX(0); }
+                        100% { transform: translateX(-50%); }
+                    }
+                    #tickerTrack:hover { animation-play-state: paused; }
+                    </style>
+                    @endif
+                    {{-- ──────────────────────────────────────────────────────────────── --}}
                     @yield('content')
                 </div>
             </main>

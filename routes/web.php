@@ -13,12 +13,20 @@ use App\Http\Controllers\ExecutorDashboardController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\AnnouncementController;
 
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('login', [AuthController::class, 'login'])->name('login.submit');
 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware('auth')->group(function () {
+
+    // ── Forced first-login password change (bypasses ForcePasswordChange middleware) ──
+    Route::get('force-password-change', function () {
+        return view('auth.force-password-change');
+    })->name('force-password-change');
+
+    Route::post('force-password-change', [UserController::class, 'forceChangePassword'])->name('force-password-change.submit');
 
     Route::get('/', function () {
         if (auth()->user()->user_role === 'executor') {
@@ -113,6 +121,13 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
         Route::post('activity-logs/load', [ActivityLogController::class, 'load'])->name('activity-logs.load');
+
+        // Announcements (admin-managed global notifications)
+        Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::post('announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::put('announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+        Route::post('announcements/{announcement}/toggle', [AnnouncementController::class, 'toggle'])->name('announcements.toggle');
 
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');

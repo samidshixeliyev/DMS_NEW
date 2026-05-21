@@ -20,6 +20,7 @@ class User extends Authenticatable
         'executor_id',
         'department_id',
         'is_deleted',
+        'force_password_change',
     ];
 
     protected $hidden = [
@@ -28,7 +29,8 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'is_deleted' => 'boolean',
+        'is_deleted'             => 'boolean',
+        'force_password_change'  => 'boolean',
     ];
 
     public function scopeActive($query)

@@ -235,7 +235,7 @@
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Tarixi</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Kim Qəbul Edib</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Qısa Məzmun</th>
-                            <th style="background:#1e3a5f;color:#fff;text-align:center;">Tapşırıq №</th>
+                            <th style="background:#1e3a5f;color:#fff;text-align:center;display:none">Qeyd</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">İcra Müddəti</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Status</th>
                             <th style="background:#1e3a5f;color:#fff;text-align:center;">Rolum</th>
@@ -384,7 +384,7 @@
                     { data: 'legalActDate', className: 'text-center' },
                     { data: 'issuingAuthority' },
                     { data: 'summary', className: 'wrap-cell' },
-                    { data: 'taskNumber', className: 'text-center' },
+                    { data: 'taskNumber', className: 'text-center', visible: false },
                     { data: 'deadlineHtml', className: 'text-center' },
                     {
                         data: 'statusHtml', className: 'text-center',
@@ -636,10 +636,13 @@
                 + '<tr><th>Daxil edən</th><td>' + insertedUserHtml + '</td></tr>'
                 + '<tr><th>Əsas icraçı</th><td>' + (data.main_executors && data.main_executors.length ? data.main_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small class="text-muted">(' + escapeHtml(e.department) + ')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
                 + '<tr><th>Digər icraçı</th><td>' + (data.helper_executors && data.helper_executors.length ? data.helper_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small class="text-muted">(' + escapeHtml(e.department) + ')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
-                + '<tr><th>Tapşırıq №</th><td>' + escapeHtml(data.task_number || '-') + '</td></tr>'
+                + (data.task_number ? '<tr><th>Qeyd</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_number) + '</td></tr>' : '')
                 + '<tr><th>Tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_description || '-') + '</td></tr>'
                 + '<tr><th>İcra müddəti</th><td>' + escapeHtml(data.execution_deadline || '-') + '</td></tr>'
-                + '</table></div>'
+                + '<tr><th>Sübut sənəd</th><td>' + (data.proof_required ? '<span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Məcburidir</span>' : '<span class="badge bg-secondary">İxtiyari</span>') + '</td></tr>'
+                + '</table>'
+                + (data.attachments && data.attachments.length ? '<div class="mt-3 p-2 rounded" style="background:#f0f9ff;border:1px solid #bae6fd"><h6 class="fw-bold mb-2" style="font-size:0.88rem"><i class="bi bi-paperclip me-1 text-info"></i>Tapşırıq Sənədləri</h6>' + buildAttachmentHtml(data.attachments) + '</div>' : '')
+                + '</div>'
                 + '<div class="col-lg-5">'
                 + '<h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i> Status Tarixçəsi</h6>'
                 + logsHtml

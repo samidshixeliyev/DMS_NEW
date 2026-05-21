@@ -339,6 +339,15 @@ class ExecutorDashboardController extends Controller
             'task_description'    => $myTaskDescription,        // private or global
             'global_task_description' => $legalAct->task_description, // always the global one
             'execution_deadline'  => $legalAct->execution_deadline?->format('d.m.Y'),
+            'attachments'         => $legalAct->attachments
+                ->filter(fn($a) => is_null($a->status_log_id))
+                ->values()
+                ->map(fn($a) => [
+                    'id'        => $a->id,
+                    'name'      => $a->original_name,
+                    'size'      => round($a->file_size / 1024, 1) . ' KB',
+                    'mime_type' => $a->mime_type,
+                ]),
             'related_document_number' => $legalAct->related_document_number,
             'related_document_date'   => $legalAct->related_document_date?->format('d.m.Y'),
             'proof_required'      => (bool) $legalAct->proof_required,

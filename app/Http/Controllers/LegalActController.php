@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\LegalAct;
+use App\Models\LegalActChangelog;
 use App\Models\ActType;
 use App\Models\IssuingAuthority;
 use App\Models\Executor;
@@ -13,7 +14,9 @@ use App\Models\Department;
 use Illuminate\Validation\Rule;
 use App\Exports\LegalActsExport;
 use App\Services\LegalActWordExportService;
+use App\Services\TaskNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -122,11 +125,10 @@ class LegalActController extends Controller
             0 => $query->orderBy('created_at', $orderDir),
             1 => $query->orderBy('legal_act_number', $orderDir),
             2 => $query->orderBy('legal_act_date', $orderDir),
-            4 => $query->orderBy('inserted_user_id', $orderDir),
-            6 => $query->orderBy('task_number', $orderDir),
-            10 => $query->orderBy('execution_deadline', $orderDir),
-            12 => $query->orderBy('related_document_number', $orderDir),
-            13 => $query->orderBy('related_document_date', $orderDir),
+            5 => $query->orderBy('task_number', $orderDir),
+            9 => $query->orderBy('execution_deadline', $orderDir),
+            11 => $query->orderBy('related_document_number', $orderDir),
+            12 => $query->orderBy('related_document_date', $orderDir),
             default => $query->orderBy('id', 'desc'),
         };
 
@@ -280,16 +282,17 @@ class LegalActController extends Controller
                 'noteHtml'         => $noteHtml,
                 'relatedDocNumber' => $act->related_document_number ?? '-',
                 'relatedDocDate'   => $act->related_document_date?->format('d.m.Y') ?? '-',
-                'insertedUser'     => $act->insertedUser?->executor
-                    ? e($act->insertedUser->executor->name) . ($act->insertedUser->executor->position ? '<br><small class="text-muted">' . e($act->insertedUser->executor->position) . '</small>' : '')
-                    : '-',
                 'organizationId'   => $act->organization_id,
                 'organizationName' => $act->organization?->name ?? '-',
                 'canEdit'          => $isAdmin
                     || ($canManage && $editableOrgIds === null)
-                    || ($canManage && $editableOrgIds !== null && in_array((int) $act->organization_id, $editableOrgIds))
-                    || (!$canManage && $userId === (int) $act->inserted_user_id),
-                'canDelete'        => $isAdmin || ($canManage && $userId === (int) $act->inserted_user_id),
+                   || ($canManage && $editableOrgIds !== null && in_array((int) $act->organization_id, $editableOrgIds))
+                   || (!$canManage && $userId === (int) $act->inserted_user_id),
+              'canDelete'        => $isAdmin || ($canManage && $userId === (int) $act->inserted_user_id),
+//                'canEdit' => $isAdmin
+//                    || ($canManage && $editableOrgIds === null && (int) $act->organization_id === (int) $user->department_id)
+//                    || ($canManage && $editableOrgIds !== null && in_array((int) $act->organization_id, $editableOrgIds))
+//                    || (!$canManage && $userId === (int) $act->inserted_user_id),
                 'hasPendingApproval' => $anyPending,
                 'pendingLogId'     => $pendingLogId,
                 'proofRequired'    => (bool) $act->proof_required,
@@ -324,7 +327,7 @@ class LegalActController extends Controller
             'legal_act_number'    => 'required|string|max:255',
             'legal_act_date'      => 'required|date_format:d.m.Y',
             'summary'             => 'required|string',
-            'task_number'         => 'nullable|string|max:255',
+            'task_number'         => 'nullable|string|max:2000',
             'task_description'    => 'nullable|string',
             'execution_deadline'  => 'nullable|date_format:d.m.Y',
             'related_document_number' => 'nullable|string|max:255',
@@ -398,6 +401,16 @@ class LegalActController extends Controller
             ]);
         }
 
+        // Notify department users about the new task assignment.
+        try {
+            (new TaskNotificationService())->notifyDepartmentUsers(
+                $legalAct,
+                array_merge($mainIds, $helperIds)
+            );
+        } catch (\Throwable $e) {
+            Log::error('LegalActController: tapşırıq bildirişi göndərilmədi', ['xəta' => $e->getMessage()]);
+        }
+
         $createDescription = sprintf(
             'Hüquqi akt yaradıldı: %s №%s (%s)',
             $legalAct->actType?->name ?? 'Naməlum növ',
@@ -454,7 +467,6 @@ class LegalActController extends Controller
             'statusLogs' => fn($q) => $q->with(['executionNote', 'user', 'attachments', 'approvedByUser'])->reorder('created_at', 'asc'),
             'executors.users',
             'attachments.user',
-            'insertedUser',
         ]);
 
         $mainExecutors   = $legalAct->executors->where('pivot.role', 'main')->values();
@@ -519,9 +531,16 @@ class LegalActController extends Controller
             'related_document_number' => $legalAct->related_document_number,
             'related_document_date'   => $legalAct->related_document_date?->format('d.m.Y'),
             'proof_required'      => (bool) $legalAct->proof_required,
-            'inserted_user'       => $legalAct->insertedUser
-                ? $legalAct->insertedUser->name . ' ' . $legalAct->insertedUser->surname : null,
             'created_at'          => $legalAct->created_at?->format('d.m.Y H:i'),
+            'attachments'         => $legalAct->attachments
+                ->filter(fn($a) => is_null($a->status_log_id))
+                ->values()
+                ->map(fn($a) => [
+                    'id'        => $a->id,
+                    'name'      => $a->original_name,
+                    'size'      => round($a->file_size / 1024, 1) . ' KB',
+                    'mime_type' => $a->mime_type,
+                ]),
             'status_logs'         => $filteredLogs->values()->map(fn($log) => [
                 'user'            => $log->user?->full_name,
                 'executor_id'     => $log->user?->executor_id,
@@ -562,7 +581,7 @@ class LegalActController extends Controller
             abort(403);
         }
 
-        $legalAct->load('executors.department');
+        $legalAct->load('executors.department', 'attachments');
 
         // Build executor list filtered by what this user may assign — admin sees all; others scoped to dept tree
         if ($user->isAdmin()) {
@@ -636,7 +655,7 @@ class LegalActController extends Controller
             'legal_act_number'    => 'required|string|max:255',
             'legal_act_date'      => 'required|date_format:d.m.Y',
             'summary'             => 'required|string',
-            'task_number'         => 'nullable|string|max:255',
+            'task_number'         => 'nullable|string|max:2000',
             'task_description'    => 'nullable|string',
             'execution_deadline'  => 'nullable|date_format:d.m.Y',
             'related_document_number' => 'nullable|string|max:255',
@@ -694,6 +713,9 @@ class LegalActController extends Controller
         $actData = collect($validated)->except(['main_executor_ids', 'helper_executor_ids', 'executor_tasks'])->toArray();
         $actData['proof_required'] = $request->boolean('proof_required') ? 1 : 0;
 
+        // ── Changelog: capture old values before update ─────────────────────────
+        $this->recordChangelog($legalAct, $actData, $mainIds, $helperIds);
+
         $legalAct->update($actData);
 
         $legalAct->executors()->detach();
@@ -744,6 +766,106 @@ class LegalActController extends Controller
         ActivityLog::record(ActivityLog::ACTION_DELETE, $description, 'LegalAct', $legalAct->id);
 
         return redirect()->route('legal-acts.index')->with('success', 'Hüquqi akt uğurla silindi.');
+    }
+
+    /**
+     * Compare old field values against incoming update data and persist changelog entries.
+     */
+    private function recordChangelog(LegalAct $legalAct, array $newData, array $newMainIds, array $newHelperIds): void
+    {
+        $fields = [
+            'legal_act_number'        => 'Akt nömrəsi',
+            'legal_act_date'          => 'Akt tarixi',
+            'summary'                 => 'Xülasə',
+            'task_number'             => 'Qeyd',
+            'task_description'        => 'Tapşırıq',
+            'execution_deadline'      => 'İcra müddəti',
+            'related_document_number' => 'Əlaqəli sənəd №',
+            'related_document_date'   => 'Əlaqəli sənəd tarixi',
+            'proof_required'          => 'Sübut sənəd',
+        ];
+
+        $userId = auth()->id();
+
+        // Scalar fields
+        foreach ($fields as $key => $label) {
+            $old = (string) ($legalAct->getAttribute($key) ?? '');
+            $new = (string) ($newData[$key] ?? '');
+
+            // Normalise boolean
+            if ($key === 'proof_required') {
+                $old = $legalAct->proof_required ? 'Bəli' : 'Xeyr';
+                $new = ($newData[$key] ?? false) ? 'Bəli' : 'Xeyr';
+            }
+
+            if ($old !== $new) {
+                LegalActChangelog::create([
+                    'legal_act_id' => $legalAct->id,
+                    'user_id'      => $userId,
+                    'field_key'    => $key,
+                    'field_label'  => $label,
+                    'old_value'    => $old ?: null,
+                    'new_value'    => $new ?: null,
+                ]);
+            }
+        }
+
+        // Act type
+        if (isset($newData['act_type_id']) && (int) $newData['act_type_id'] !== (int) $legalAct->act_type_id) {
+            LegalActChangelog::create([
+                'legal_act_id' => $legalAct->id,
+                'user_id'      => $userId,
+                'field_key'    => 'act_type_id',
+                'field_label'  => 'Akt növü',
+                'old_value'    => $legalAct->actType?->name,
+                'new_value'    => ActType::find($newData['act_type_id'])?->name,
+            ]);
+        }
+
+        // Issuing authority
+        if (isset($newData['issued_by_id']) && (int) $newData['issued_by_id'] !== (int) $legalAct->issued_by_id) {
+            LegalActChangelog::create([
+                'legal_act_id' => $legalAct->id,
+                'user_id'      => $userId,
+                'field_key'    => 'issued_by_id',
+                'field_label'  => 'Verən orqan',
+                'old_value'    => $legalAct->issuingAuthority?->name,
+                'new_value'    => IssuingAuthority::find($newData['issued_by_id'])?->name,
+            ]);
+        }
+
+        // Executors
+        $legalAct->loadMissing('executors');
+        $oldMainIds   = $legalAct->executors->where('pivot.role', 'main')->pluck('id')->sort()->values()->toArray();
+        $oldHelperIds = $legalAct->executors->where('pivot.role', 'helper')->pluck('id')->sort()->values()->toArray();
+        $sortedNewMain   = collect($newMainIds)->sort()->values()->toArray();
+        $sortedNewHelper = collect($newHelperIds)->sort()->values()->toArray();
+
+        if ($oldMainIds !== $sortedNewMain) {
+            $oldNames = Executor::whereIn('id', $oldMainIds)->pluck('name')->join(', ');
+            $newNames = Executor::whereIn('id', $sortedNewMain)->pluck('name')->join(', ');
+            LegalActChangelog::create([
+                'legal_act_id' => $legalAct->id,
+                'user_id'      => $userId,
+                'field_key'    => 'main_executors',
+                'field_label'  => 'Əsas icraçılar',
+                'old_value'    => $oldNames ?: null,
+                'new_value'    => $newNames ?: null,
+            ]);
+        }
+
+        if ($oldHelperIds !== $sortedNewHelper) {
+            $oldNames = Executor::whereIn('id', $oldHelperIds)->pluck('name')->join(', ');
+            $newNames = Executor::whereIn('id', $sortedNewHelper)->pluck('name')->join(', ');
+            LegalActChangelog::create([
+                'legal_act_id' => $legalAct->id,
+                'user_id'      => $userId,
+                'field_key'    => 'helper_executors',
+                'field_label'  => 'Digər icraçılar',
+                'old_value'    => $oldNames ?: null,
+                'new_value'    => $newNames ?: null,
+            ]);
+        }
     }
 
     public function exportExcel(Request $request)
@@ -929,7 +1051,6 @@ class LegalActController extends Controller
             'latestStatusLog.approvedByUser',
             'statusLogs' => fn($q) => $q->with('executionNote', 'user')->reorder('created_at', 'asc'),
             'executors.users',
-            'insertedUser.executor',
             'organization',
         ])->active();
 

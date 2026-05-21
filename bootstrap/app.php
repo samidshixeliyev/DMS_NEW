@@ -16,8 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['logout']);
 
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'role'                  => \App\Http\Middleware\RoleMiddleware::class,
+            'force.password.change' => \App\Http\Middleware\ForcePasswordChange::class,
         ]);
+
+        // Enforce password-reset page for first-login users on every authenticated web request.
+        $middleware->appendToGroup('web', \App\Http\Middleware\ForcePasswordChange::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Redirect to login on any 419 (stale login form, idle session, etc.).
