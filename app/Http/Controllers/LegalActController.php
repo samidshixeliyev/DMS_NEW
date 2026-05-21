@@ -46,14 +46,15 @@ class LegalActController extends Controller
 
         $pendingApprovalCount = 0;
         if ($canManage) {
-            $icraIds = ExecutionNote::active()->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))->pluck('id')->toArray();
-            if (count($icraIds) > 0) {
-                $pendingQuery = ExecutorStatusLog::pending()->whereIn('execution_note_id', $icraIds);
-                if (!$user->isAdmin()) {
-                    $pendingQuery->whereHas('legalAct', fn($q) => $q->where('organization_id', $user->department_id)->where('is_deleted', false));
-                }
-                $pendingApprovalCount = $pendingQuery->count();
+            // Subquery avoids loading IDs into PHP only to pass them back to SQL.
+            $icraNoteIds = ExecutionNote::active()
+                ->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))
+                ->select('id');
+            $pendingQuery = ExecutorStatusLog::pending()->whereIn('execution_note_id', $icraNoteIds);
+            if (!$user->isAdmin()) {
+                $pendingQuery->whereHas('legalAct', fn($q) => $q->where('organization_id', $user->department_id)->where('is_deleted', false));
             }
+            $pendingApprovalCount = $pendingQuery->count();
         }
 
         // Org-filter tabs: own dept + all ancestors filtered to can_assign=true.
@@ -1043,14 +1044,16 @@ class LegalActController extends Controller
 
     private function applyFilters(Request $request)
     {
+        // Only load relations actually consumed by load() row rendering.
+        // - executors.users was never read after load (dropped)
+        // - latestStatusLog.approvedByUser was loaded but only latestStatusLog.executionNote
+        //   is used for the status badge; approvedByUser is fetched in show() instead.
         $query = LegalAct::with([
             'actType',
             'issuingAuthority',
             'executors.department',
             'latestStatusLog.executionNote',
-            'latestStatusLog.approvedByUser',
             'statusLogs' => fn($q) => $q->with('executionNote', 'user')->reorder('created_at', 'asc'),
-            'executors.users',
             'organization',
         ])->active();
 

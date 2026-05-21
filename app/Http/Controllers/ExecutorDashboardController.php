@@ -13,19 +13,9 @@ use Illuminate\Support\Str;
 
 class ExecutorDashboardController extends Controller
 {
-    private ?array $icraOlunubNoteIds = null;
-
-    private function getIcraOlunubNoteIds(): array
-    {
-        return $this->icraOlunubNoteIds ??= ExecutionNote::active()
-            ->where(fn($q) => $q->where('note', 'like', '%İcra olunub%')->orWhere('note', 'like', '%icra olunub%'))
-            ->pluck('id')
-            ->toArray();
-    }
-
     private function isIcraOlunubNote(?int $noteId): bool
     {
-        return $noteId && in_array($noteId, $this->getIcraOlunubNoteIds());
+        return $noteId && in_array($noteId, ExecutionNote::icraOlunubIds(), true);
     }
 
     private function isQismenIcraNote(int $noteId): bool

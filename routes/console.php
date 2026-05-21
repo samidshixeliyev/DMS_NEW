@@ -23,16 +23,9 @@ Schedule::call(function () {
     $service = app(TaskNotificationService::class);
 
     // ── Step 1: SQL səviyyəsində icra edilmiş aktların ID-lərini tap ─────
-    // "İcra olunub" statusu olan ExecutionNote-ların ID-ləri
-    $icraIds = ExecutionNote::active()
-        ->where(function ($q) {
-            $q->where('note', 'like', '%İcra olunub%')
-              ->orWhere('note', 'like', '%icra olunub%');
-        })
-        ->pluck('id');
+    $icraIds = ExecutionNote::icraOlunubIds();
 
-    // Həmin note-lara aid, approved statuslu logları olan aktların ID-ləri
-    $executedActIds = $icraIds->isNotEmpty()
+    $executedActIds = !empty($icraIds)
         ? ExecutorStatusLog::whereIn('execution_note_id', $icraIds)
             ->where('approval_status', 'approved')
             ->pluck('legal_act_id')

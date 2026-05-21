@@ -1,0 +1,66 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name your-domain.az;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name your-domain.az;
+
+    root /var/www/dms-app/public;
+    index index.php;
+
+    ssl_certificate     /etc/letsencrypt/live/your-domain.az/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.az/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 50M;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Long-cache hashed Vite assets (public/build/assets/*.{js,css} carry content hashes)
+    location ~* ^/build/assets/.+\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|webp|ico)$ {
+        expires 1y;
+        access_log off;
+        add_header Cache-Control "public, immutable, max-age=31536000";
+        try_files $uri =404;
+    }
+
+    # Short-cache other static assets in public/
+    location ~* \.(woff2?|ttf|eot|svg|png|jpg|jpeg|gif|webp|ico|css|js)$ {
+        expires 7d;
+        access_log off;
+        add_header Cache-Control "public, max-age=604800";
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_read_timeout 120;
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript application/wasm image/svg+xml;
+}
