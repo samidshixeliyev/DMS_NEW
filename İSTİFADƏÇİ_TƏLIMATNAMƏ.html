@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DMS — İstifadəçi Təlimatnaməsi</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      line-height: 1.7;
+    }
+
+    /* Cover */
+    .cover {
+      background: linear-gradient(135deg, #0f1f33 0%, #1e3a5f 50%, #2a5298 100%);
+      color: #fff;
+      text-align: center;
+      padding: 80px 40px;
+      page-break-after: always;
+    }
+    .cover .logo-icon {
+      width: 80px; height: 80px;
+      background: rgba(0,180,216,0.2);
+      border: 3px solid #00b4d8;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      margin-bottom: 24px;
+    }
+    .cover h1 { font-size: 3rem; font-weight: 800; letter-spacing: -1px; }
+    .cover h2 { font-size: 1.4rem; font-weight: 400; color: #a0c4ff; margin-top: 8px; }
+    .cover .subtitle {
+      margin-top: 32px;
+      font-size: 1.1rem;
+      color: #cbd5e1;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .cover .meta {
+      margin-top: 48px;
+      font-size: 0.85rem;
+      color: #64748b;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 20px;
+    }
+
+    /* TOC */
+    .toc {
+      background: #fff;
+      max-width: 900px;
+      margin: 40px auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+      padding: 40px;
+    }
+    .toc h2 {
+      font-size: 1.4rem;
+      color: #1e3a5f;
+      border-bottom: 3px solid #00b4d8;
+      padding-bottom: 12px;
+      margin-bottom: 24px;
+    }
+    .toc ol { padding-left: 24px; }
+    .toc li { margin: 8px 0; font-size: 1rem; }
+    .toc a { color: #2a5298; text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* Main content */
+    .content { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+
+    /* Section */
+    .section {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.07);
+      margin-bottom: 40px;
+      overflow: hidden;
+    }
+    .section-header {
+      background: linear-gradient(135deg, #1e3a5f, #2a5298);
+      color: #fff;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .section-header .num {
+      background: rgba(255,255,255,0.2);
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .section-header h2 { font-size: 1.25rem; font-weight: 700; }
+    .section-body { padding: 32px; }
+
+    /* Screenshot */
+    .screenshot-wrap {
+      margin: 24px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+      border: 1px solid #e2e8f0;
+    }
+    .screenshot-wrap img {
+      width: 100%;
+      display: block;
+    }
+    .screenshot-caption {
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    /* Steps */
+    .steps { list-style: none; counter-reset: steps; padding: 0; }
+    .steps li {
+      counter-increment: steps;
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .steps li::before {
+      content: counter(steps);
+      background: #00b4d8;
+      color: #fff;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Info / note boxes */
+    .note {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 20px 0;
+      font-size: 0.93rem;
+    }
+    .note.warning {
+      background: #fffbeb;
+      border-left-color: #f59e0b;
+    }
+    .note.success {
+      background: #f0fdf4;
+      border-left-color: #22c55e;
+    }
+    .note strong { display: block; margin-bottom: 4px; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.93rem; }
+    th {
+      background: #1e3a5f;
+      color: #fff;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* Badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-admin { background: #fef2f2; color: #991b1b; }
+    .badge-manager { background: #eff6ff; color: #1d4ed8; }
+    .badge-user { background: #f0fdf4; color: #15803d; }
+
+    /* Sidebar callout */
+    .sidebar-menu {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+    .sidebar-menu h4 { color: #1e3a5f; margin-bottom: 12px; font-size: 1rem; }
+    .sidebar-menu ul { list-style: none; padding: 0; }
+    .sidebar-menu li {
+      padding: 6px 0;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 0.93rem;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .sidebar-menu li:last-child { border-bottom: none; }
+    .menu-icon { color: #00b4d8; font-size: 1.1rem; }
+
+    /* Status badges */
+    .status { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .status-new { background: #dbeafe; color: #1d4ed8; }
+    .status-process { background: #fef9c3; color: #92400e; }
+    .status-done { background: #dcfce7; color: #15803d; }
+    .status-overdue { background: #fee2e2; color: #991b1b; }
+
+    p { margin-bottom: 12px; }
+    h3 { color: #1e3a5f; margin: 24px 0 12px; font-size: 1.05rem; }
+
+    .divider { height: 1px; background: #e2e8f0; margin: 28px 0; }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="logo-icon">📄</div>
+  <h1>DMS</h1>
+  <h2>Sənəd İdarəetmə Sistemi</h2>
+  <p class="subtitle">
+    Bu təlimatnamə DMS sisteminin bütün funksionallıqlarını izah edir.<br>
+    Hüquqi aktların qeydiyyatından hesabatlara qədər addım-addım rəhbər.
+  </p>
+  <div class="meta">
+    İstifadəçi Təlimatnaməsi &nbsp;|&nbsp; 2026 &nbsp;|&nbsp; Problemlər üçün: <strong style="color:#a0c4ff;">10-195</strong>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>📋 Mündəricat</h2>
+  <ol>
+    <li><a href="#s1">Sistemə Giriş (Login)</a></li>
+    <li><a href="#s2">İdarəetmə Paneli — Ümumi Baxış</a></li>
+    <li><a href="#s3">Hüquqi Aktlar</a></li>
+    <li><a href="#s4">İcraçı Paneli</a></li>
+    <li><a href="#s5">Təsdiq Gözləyənlər</a></li>
+    <li><a href="#s6">Hesabat</a></li>
+    <li><a href="#s7">Kataloqlar</a></li>
+    <li><a href="#s8">Admin — İstifadəçi İdarəetməsi</a></li>
+    <li><a href="#s9">Admin — Aktivlik Jurnalı</a></li>
+    <li><a href="#s10">Şifrəni Dəyiş &amp; Çıxış</a></li>
+  </ol>
+</div>
+
+<div class="content">
+
+  <!-- ==================== SECTION 1: LOGIN ==================== -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="num">1</div>
+      <h2>Sistemə Giriş (Login)</h2>
+    </div>
+    <div class="section-body">
+      <p>DMS sisteminə daxil olmaq üçün brauzer vasitəsilə sistemin ünvanını açın. Giriş səhifəsi avtomatik olaraq göstəriləcəkdir.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/01_login.png" alt="Giriş səhifəsi">
+        <div class="screenshot-caption">Şəkil 1.1 — DMS Giriş səhifəsi</div>
+      </div>
+
+      <h3>Giriş addımları:</h3>
+      <ol class="steps">
+        <li><strong>İstifadəçi adı</strong> xanasına istifadəçi adınızı daxil edin (məs. <code>admin</code>, <code>manager</code>).</li>
+        <li><strong>Şifrə</strong> xanasına şifrənizi daxil edin. Şifrəni görmək üçün sağdakı göz ikonuna basın.</li>
+        <li>İstəsəniz <strong>Məni xatırla</strong> seçimini işarələyin — sistem sizi növbəti dəfə avtomatik tanıyacaq.</li>
+        <li><strong>Daxil ol</strong> düyməsinə basın.</li>
+      </ol>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/02_login_filled.png" alt="Giriş formu doldurulmuş">
+        <div class="screenshot-caption">Şəkil 1.2 — Giriş məlumatları doldurulmuş vəziyyət</div>
+      </div>
+
+      <div class="note warning">
+        <strong>⚠️ Diqqət</strong>
+        Yanlış istifadəçi adı və ya şifrə daxil edilərsə, səhifədə xəta mesajı göstəriləcək. Bu halda məlumatlarınızı yenidən yoxlayın. Köməyə ehtiyacınız olsa <strong>10-195</strong> nömrəsinə müraciət edin.
+      </div>
+
+      <h3>İstifadəçi rolları:</h3>
+      <table>
+        <tr>
+          <th>Rol</th>
+          <th>Çıxış imkanları</th>
+        </tr>
+        <tr>
+          <td><span class="badge badge-admin">Admin</span></td>
+          <td>Bütün bölmələrə tam giriş: hüquqi aktlar, icraçı paneli, təsdiq, hesabat, kataloqlar, istifadəçilər, aktivlik jurnalı</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-manager">Menecer</span></td>
+          <td>Hüquqi aktlar, icraçı paneli, təsdiq gözləyənlər, hesabat, kataloqlar</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-user">İstifadəçi</span></td>
+          <td>Hüquqi aktlar, kataloqlar (yalnız oxuma)</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 2: DASHBOARD OVERVIEW ==================== -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="num">2</div>
+      <h2>İdarəetmə Paneli — Ümumi Baxış</h2>
+    </div>
+    <div class="section-body">
+      <p>Sistemə daxil olduqdan sonra <strong>İdarəetmə Paneli</strong> açılır. Sol tərəfdə naviqasiya menyusu, sağda isə əsas məzmun sahəsi yer alır.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/03_legal_acts_list.png" alt="İdarəetmə Paneli">
+        <div class="screenshot-caption">Şəkil 2.1 — Əsas İdarəetmə Paneli görünüşü</div>
+      </div>
+
+      <div class="sidebar-menu">
+        <h4>🗂️ Sol Naviqasiya Menyusu</h4>
+        <ul>
+          <li><span class="menu-icon">📋</span> <strong>Hüquqi Aktlar</strong> — hüquqi sənədlərin siyahısı</li>
+          <li><span class="menu-icon">👤</span> <strong>İcraçı Paneli</strong> — icraçılara verilmiş tapşırıqlar</li>
+          <li><span class="menu-icon">✅</span> <strong>Təsdiq Gözləyənlər</strong> — təsdiqi gözləyən icra statusları</li>
+          <li><span class="menu-icon">📊</span> <strong>Hesabat</strong> — statistika və hesabatlar</li>
+          <li><span class="menu-icon">📁</span> <strong>Sənəd növləri</strong> (Kataloq)</li>
+          <li><span class="menu-icon">🏛️</span> <strong>Kim qəbul edib</strong> (Kataloq)</li>
+          <li><span class="menu-icon">🏢</span> <strong>İdarələr</strong> (Kataloq)</li>
+          <li><span class="menu-icon">👔</span> <strong>Rəhbərlər</strong> (Kataloq)</li>
+          <li><span class="menu-icon">📝</span> <strong>İcra qeydləri</strong> (Kataloq)</li>
+          <li><span class="menu-icon">👥</span> <strong>İstifadəçilər</strong> (Admin)</li>
+          <li><span class="menu-icon">📰</span> <strong>Aktivlik Jurnalı</strong> (Admin)</li>
+          <li><span class="menu-icon">🔑</span> <strong>Şifrəni dəyiş</strong></li>
+          <li><span class="menu-icon">🚪</span> <strong>Çıxış</strong></li>
+        </ul>
+      </div>
+
+      <div class="note success">
+        <strong>💡 Məsləhət</strong>
+        Sol menyunun yuxarısındakı <strong>&lt;</strong> oxuna basaraq menyunu yığcamlaşdıra, ekranın iş sahəsini genişlədə bilərsiniz.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 3: LEGAL ACTS ==================== -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="num">3</div>
+      <h2>Hüquqi Aktlar</h2>
+    </div>
+    <div class="section-body">
+      <p>Sistemin əsas bölməsi olan <strong>Hüquqi Aktlar</strong> bütün qeydiyyata alınmış sənədləri — əmrlər, qərarlar, sərəncamlar — idarə edir. Hər sənəd üçün icra müddəti, icraçı, status izlənir.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/03_legal_acts_list.png" alt="Hüquqi Aktlar Siyahısı">
+        <div class="screenshot-caption">Şəkil 3.1 — Hüquqi Aktlar siyahısı</div>
+      </div>
+
+      <h3>Filtrlər paneli</h3>
+      <p>Siyahının yuxarısındakı filtrlər paneli vasitəsilə axtarış apara bilərsiniz:</p>
+      <table>
+        <tr><th>Filtr</th><th>İzah</th></tr>
+        <tr><td>Aktın növü</td><td>Əmr, Qərar, Sərəncam və s.</td></tr>
+        <tr><td>Kim qəbul edib</td><td>Sənədi çıxaran qurum</td></tr>
+        <tr><td>Sənədin statusu</td><td>Müddətdədir / Bitib / Müddətsiz</td></tr>
+        <tr><td>Tarixlər</td><td>Başlanğıc və bitmə tarixləri üzrə aralıq</td></tr>
+        <tr><td>İcraçı</td><td>Tapşırıq verilmiş şəxs</td></tr>
+        <tr><td>Tapşırıq №</td><td>Nömrə üzrə axtarış</td></tr>
+      </table>
+
+      <h3>Nişanlar (tablar)</h3>
+      <p>Siyahı müxtəlif nişanlar üzrə bölünür:</p>
+      <ul style="margin-left:20px; margin-bottom:16px;">
+        <li><strong>Baş Görəvlər</strong> — bütün əsas aktlar</li>
+        <li><strong>İcrada</strong> — hazırda icra edilənlər</li>
+        <li><strong>Müddəti Keçmiş Aktlar</strong> — gecikmiş sənədlər</li>
+        <li><strong>Müddəti Başa Çatanlar</strong> — bu günlərdə tamamlananlar</li>
+        <li><strong>Rədd Edilmiş Sənədlər</strong> — rədd edilmiş icra mərhələləri</li>
+      </ul>
+
+      <h3>Cədvəl sütunları</h3>
+      <table>
+        <tr><th>Sütun</th><th>İzah</th></tr>
+        <tr><td>#</td><td>Sıra nömrəsi</td></tr>
+        <tr><td>Növü</td><td>Sənəd növü (Əmr, Qərar, Sərəncam)</td></tr>
+        <tr><td>Nömrəsi</td><td>Sənədin rəsmi nömrəsi</td></tr>
+        <tr><td>Tarixi</td><td>Qəbul edildiyi tarix</td></tr>
+        <tr><td>Qısa Məzmun</td><td>Sənədin qısa təsviri</td></tr>
+        <tr><td>İcraçı</td><td>Tapşırıq verilmiş şəxs</td></tr>
+        <tr><td>Göndərən</td><td>Tapşırığı yaradan istifadəçi</td></tr>
+        <tr><td>Tapşırıq №</td><td>Daxili tapşırıq nömrəsi</td></tr>
+        <tr><td>Tarixlər</td><td>İcra başlanğıc – bitmə tarixi</td></tr>
+        <tr><td>Əməliyyat</td><td>Bax / Düzəlt / Sil düymələri</td></tr>
+      </table>
+
+      <div class="divider"></div>
+
+      <h3>📤 İxrac (Export)</h3>
+      <p>Siyahını <strong>Excel</strong> və ya <strong>Word</strong> formatında yükləmək üçün sağ üst köşədəki <strong>E Excel</strong> və <strong>W Word</strong> düymələrinə basın.</p>
+
+      <div class="note">
+        <strong>📌 Qeyd</strong>
+        Siyahı yalnız hazırda tətbiq edilmiş filtrlərə uyğun məlumatları ixrac edir. İxracdan öncə lazımi filtrləri tənzimləyin.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 4: EXECUTOR DASHBOARD ==================== -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="num">4</div>
+      <h2>İcraçı Paneli</h2>
+    </div>
+    <div class="section-body">
+      <p><strong>İcraçı Paneli</strong> icraçılara verilmiş tapşırıqların izləndiyi bölmədir. İcraçılar burada öz tapşırıqlarını görür, statuslarını yeniləyir və sənəd əlavə edə bilirlər.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/04_executor_dashboard.png" alt="İcraçı Paneli">
+        <div class="screenshot-caption">Şəkil 4.1 — İcraçı Paneli</div>
+      </div>
+
+      <h3>Əsas elementlər:</h3>
+      <ol class="steps">
+        <li><strong>İdarə seçin</strong> açılan siyahısından istəyinizə uyğun idarəni seçin — cədvəl avtomatik yenilənir.</li>
+        <li>Hər sətirdə tapşırığın <strong>Növü, Nömrəsi, Tarixi, Qısa Məzmunu</strong> və <strong>İcra Müddəti</strong> görünür.</li>
+        <li><strong>Status</strong> sütununda tapşırığın mövcud vəziyyəti göstərilir:
+          <ul style="margin-left:20px; margin-top:8px;">
+            <li><span class="status status-new">Yeni</span> — tapşırıq yenicə daxil edilib</li>
+            <li><span class="status status-process">İcrada</span> — icra prosesindədir</li>
+            <li><span class="status status-done">İcra edilib</span> — tamamlanıb, təsdiq gözlənilir</li>
+            <li><span class="status status-overdue">Gecikmiş</span> — müddəti keçmişdir</li>
+          </ul>
+        </li>
+        <li>Tapşırığın ətraflı məlumatına keçmək üçün <strong>Bax</strong> düyməsinə, statusu yeniləmək üçün isə tapşırığı açıb dəyişiklik etmək mümkündür.</li>
+      </ol>
+
+      <div class="note success">
+        <strong>💡 Status yeniləmə</strong>
+        Tapşırığı açdıqdan sonra yeni status seçin, lazım gəldikdə sənəd (fayl) əlavə edin və yadda saxlayın. Yenilənmiş status menecerə göndərilir.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 5: APPROVALS ==================== -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="num">5</div>
+      <h2>Təsdiq Gözləyənlər</h2>
+    </div>
+    <div class="section-body">
+      <p>Bu bölmə <strong>Menecer</strong> və <strong>Admin</strong> rollu istifadəçilər üçündür. İcraçıların yüklədikləri status yeniləmələri burada göstərilir və menecer onları <strong>Təsdiq</strong> və ya <strong>Rədd</strong> edə bilər.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/05_approvals.png" alt="Təsdiq Gözləyənlər">
+        <div class="screenshot-caption">Şəkil 5.1 — Təsdiq Gözləyənlər bölməsi</div>
+      </div>
+
+      <h3>Sütunların izahı:</h3>
+      <table>
+        <tr><th>Sütun</th><th>İzah</th></tr>
+        <tr><td>Növü</td><td>Sənəd növü</td></tr>
+        <tr><td>Nömrəsi</td><td>Sənəd nömrəsi</td></tr>
+        <tr><td>Tarixi</td><td>Sənədin tarixi</td></tr>
+        <tr><td>Qısa Məzmun</td><td>Tapşırığın qısa məzmunu</td></tr>
+        <tr><td>İcraçı</td><td>Tapşırığı icra edən şəxs</td></tr>
+        <tr><td>Göndərən</td><td>Statusu göndərən istifadəçi</td></tr>
+        <tr><td>Göndərilmə Tarixi</td><td>Statusun göndərilmə tarixi</td></tr>
+        <tr><td>Sənədlər</td><td>Əlavə edilmiş fayllar (klikləyərək yükləmək olar)</td></tr>
+        <tr><td>İcra Müddəti</td><td>Tapşırığın son icra tarixi</td></tr>
+        <tr><td>Əməliyyat</td><td>Təsdiq et / Rədd et düymələri</td></tr>
+      </table>
+
+      <h3>Təsdiqləmə prosesi:</h3>
+      <ol class="steps">
+        <li>Siyahıda təsdiqi gözləyən sətri tapın.</li>
+        <li>Fayllar sütununda əlavə edilmiş sənədləri nəzərdən keçirin.</li>
+        <li><strong>Təsdiq et</strong> (yaşıl) düyməsinə basaraq icranı qəbul edin <em>— və ya —</em> <strong>Rədd et</strong> (qırmızı) düyməsinə basaraq geri qaytarın.</li>
+        <li>Rədd edildikdə icraçıya bildiriş göndərilir, o yenidən icra statusu göndərə bilər.</li>
+      </ol>
+
+      <div class="note">
+        <strong>📌 Qeyd</strong>
+        Siyahıda «Məlumat yoxdur» yazısı görünürsə, hazırda heç bir təsdiq gözlənilmir.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 6: REPORTS ==================== -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="num">6</div>
+      <h2>Hesabat</h2>
+    </div>
+    <div class="section-body">
+      <p><strong>Hesabat</strong> bölməsi bütün aktların statistik icmalını vizual şəkildə göstərir. Menecer və Admin rollu istifadəçilər üçündür.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/06_reports.png" alt="Hesabat bölməsi">
+        <div class="screenshot-caption">Şəkil 6.1 — Hesabat bölməsi — statistika və qrafiklər</div>
+      </div>
+
+      <h3>Hesabat elementləri:</h3>
+      <table>
+        <tr><th>Element</th><th>İzah</th></tr>
+        <tr><td>Ümumi sayı</td><td>Sistemdəki ümumi akt sayı</td></tr>
+        <tr><td>Müddətsiz</td><td>Son tarixi olmayan aktlar</td></tr>
+        <tr><td>Müddəti keçmiş</td><td>Gecikmiş aktların sayı</td></tr>
+        <tr><td>Tapşırıqsız</td><td>Hələ icraçıya verilməmiş aktlar</td></tr>
+        <tr><td>Qrafik (bar chart)</td><td>İdarə üzrə akt paylanması</td></tr>
+        <tr><td>Donut qrafik</td><td>Ümumi vəziyyətin faizlə bölgüsü</td></tr>
+        <tr><td>Cədvəl</td><td>Hər idarə üzrə ətraflı göstəricilər</td></tr>
+      </table>
+
+      <h3>Excel ixracı:</h3>
+      <ol class="steps">
+        <li>Sağ üst köşədəki <strong>Excel</strong> düyməsinə basın.</li>
+        <li>Fayl avtomatik yüklənəcək — filtrlərə uyğun məlumatları ehtiva edəcək.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 7: CATALOGS ==================== -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="num">7</div>
+      <h2>Kataloqlar</h2>
+    </div>
+    <div class="section-body">
+      <p>Kataloqlar bölməsi sistemin istinad məlumatlarını — sənəd növlərini, idarələri, icraçıları və s. — idarə edir. Bu məlumatlar hüquqi akt yaradılarkən açılan siyahılarda görünür.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/07_catalog_act_types.png" alt="Sənəd Növləri Kataloqu">
+        <div class="screenshot-caption">Şəkil 7.1 — Sənəd Növləri kataloqu (Aktın Növləri)</div>
+      </div>
+
+      <h3>Kataloq bölmələri:</h3>
+
+      <div class="divider"></div>
+      <h3>7.1 Sənəd növləri</h3>
+      <p>Hüquqi aktların növlərini idarə edir: Əmr, Qərar, Sərəncam və s.</p>
+      <ol class="steps">
+        <li>Sol menyudan <strong>Sənəd növləri</strong>ni seçin.</li>
+        <li>Yeni növ əlavə etmək üçün <strong>Yeni əlavə et</strong> düyməsinə basın, adı yazın, <strong>Yadda saxla</strong>.</li>
+        <li>Mövcud növü redaktə etmək üçün <strong>🖊</strong> (qələm) ikonuna, silmək üçün <strong>🗑</strong> (zibil) ikonuna basın.</li>
+      </ol>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/08_catalog_departments.png" alt="İdarələr Kataloqu">
+        <div class="screenshot-caption">Şəkil 7.2 — İdarələr kataloqu</div>
+      </div>
+
+      <h3>7.2 Kim qəbul edib (Sənədi çıxaran qurumlar)</h3>
+      <p>Hüquqi aktı qəbul etmiş qurumların siyahısını saxlayır.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/09_catalog_issuing_authorities.png" alt="Kim qəbul edib">
+        <div class="screenshot-caption">Şəkil 7.3 — Kim qəbul edib kataloqu</div>
+      </div>
+
+      <h3>7.3 İdarələr</h3>
+      <p>Sistemi istifadə edən idarə/departamentlər. Hər idarəyə rəhbər təyin oluna bilər.</p>
+
+      <h3>7.4 Rəhbərlər (İcraçılar)</h3>
+      <p>Tapşırıq verilə biləcək şəxslərin siyahısı. Hər icraçı bir idarəyə bağlıdır.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/10_catalog_executors.png" alt="Rəhbərlər Kataloqu">
+        <div class="screenshot-caption">Şəkil 7.4 — Rəhbərlər (icraçılar) kataloqu</div>
+      </div>
+
+      <h3>7.5 İcra qeydləri</h3>
+      <p>İcra prosesindəki standart qeyd növlərini saxlayır (məs. «İcrada», «Tamamlandı» kimi xüsusi qeydlər).</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/11_catalog_execution_notes.png" alt="İcra Qeydləri">
+        <div class="screenshot-caption">Şəkil 7.5 — İcra qeydləri kataloqu</div>
+      </div>
+
+      <div class="note">
+        <strong>📌 Kataloqlar üzrə ümumi qaydalar</strong>
+        Bütün kataloqlarda: <strong>Yeni əlavə et</strong> → ad daxil et → <strong>Yadda saxla</strong>. Redaktə üçün <strong>🖊</strong>, silmək üçün <strong>🗑</strong> istifadə edilir. Bir qeyd silindikdə, ona bağlı aktlar üzərindəki məlumatlar da silinə bilər — diqqətli olun.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 8: USERS ==================== -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="num">8</div>
+      <h2>Admin — İstifadəçi İdarəetməsi</h2>
+    </div>
+    <div class="section-body">
+      <p>Bu bölmə yalnız <span class="badge badge-admin">Admin</span> rolu üçün əlçatandır. Burada sistemdəki bütün istifadəçilər idarə olunur.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/12_admin_users.png" alt="İstifadəçilər">
+        <div class="screenshot-caption">Şəkil 8.1 — İstifadəçilər idarəetmə bölməsi</div>
+      </div>
+
+      <h3>İstifadəçi cədvəlinin sütunları:</h3>
+      <table>
+        <tr><th>Sütun</th><th>İzah</th></tr>
+        <tr><td>Ad / Soyad</td><td>İstifadəçinin tam adı</td></tr>
+        <tr><td>İstifadəçi adı</td><td>Sistemə giriş üçün unikal istifadəçi adı</td></tr>
+        <tr><td>E-poçt</td><td>E-poçt ünvanı</td></tr>
+        <tr><td>Rol</td><td>Admin / Menecer / İstifadəçi</td></tr>
+        <tr><td>Rəhbər icrası</td><td>Hansı icraçıya bağlı olduğu</td></tr>
+        <tr><td>İdarə</td><td>Bağlı olduğu idarə</td></tr>
+        <tr><td>Əməliyyat</td><td>Bax / Düzəlt / Şifrə sıfırla / Sil</td></tr>
+      </table>
+
+      <h3>Yeni istifadəçi əlavə etmək:</h3>
+      <ol class="steps">
+        <li>Sağ üst köşədəki <strong>Yeni istifadəçi</strong> düyməsinə basın.</li>
+        <li>Ad, soyad, istifadəçi adı, e-poçt, şifrə, rol sahələrini doldurun.</li>
+        <li>Lazım gəldikdə idarə və rəhbər icrasını seçin.</li>
+        <li><strong>Yadda saxla</strong> düyməsinə basın.</li>
+      </ol>
+
+      <div class="note warning">
+        <strong>⚠️ Diqqət</strong>
+        İstifadəçi adı sistemdə unikal olmalıdır. Eyni istifadəçi adı ilə ikinci hesab yaratmaq mümkün deyil.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 9: ACTIVITY LOG ==================== -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="num">9</div>
+      <h2>Admin — Aktivlik Jurnalı</h2>
+    </div>
+    <div class="section-body">
+      <p><strong>Aktivlik Jurnalı</strong> sistemdə edilən bütün əməliyyatların tarixçəsini saxlayır. Yalnız <span class="badge badge-admin">Admin</span> üçün əlçatandır.</p>
+
+      <div class="screenshot-wrap">
+        <img src="guide_screenshots/13_admin_activity_log.png" alt="Aktivlik Jurnalı">
+        <div class="screenshot-caption">Şəkil 9.1 — Aktivlik Jurnalı</div>
+      </div>
+
+      <h3>Jurnalda nə görünür:</h3>
+      <table>
+        <tr><th>Sütun</th><th>İzah</th></tr>
+        <tr><td>Əməliyyat</td><td>Hansı əməliyyat edildiyi (giriş, çıxış, yeni akt, redaktə, silmə və s.)</td></tr>
+        <tr><td>İstifadəçi</td><td>Əməliyyatı edən istifadəçinin adı</td></tr>
+        <tr><td>IP ünvan</td><td>Əməliyyatın edildiyi cihazın IP ünvanı</td></tr>
+        <tr><td>Tarix / Saat</td><td>Dəqiq vaxt möhürü</td></tr>
+      </table>
+
+      <h3>Filtrlər:</h3>
+      <p>Əməliyyat növünə görə filtrləmək üçün yuxarıdakı <strong>Əməliyyat</strong> açılan siyahısını istifadə edin. Siyahını yeniləmək üçün <strong>Yenilə</strong> düyməsinə basın.</p>
+
+      <div class="note">
+        <strong>📌 Nə üçün lazımdır?</strong>
+        Aktivlik jurnalı sistemi kim tərəfindən, nə vaxt istifadə edilib sorusunu cavablandırır. Zəruri hallarda (məs. icazəsiz giriş şübhəsi olduqda) bu jurnaldan istifadə edin.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 10: PASSWORD & LOGOUT ==================== -->
+  <div class="section" id="s10">
+    <div class="section-header">
+      <div class="num">10</div>
+      <h2>Şifrəni Dəyiş &amp; Çıxış</h2>
+    </div>
+    <div class="section-body">
+      <h3>Şifrəni dəyişmək:</h3>
+      <ol class="steps">
+        <li>Sol menyunun alt hissəsindəki <strong>Şifrəni dəyiş</strong> bağlantısına basın.</li>
+        <li>Açılan formada <strong>Mövcud şifrə</strong>, <strong>Yeni şifrə</strong> və <strong>Təkrar yeni şifrə</strong> xanalarını doldurun.</li>
+        <li><strong>Yadda saxla</strong> düyməsinə basın. Əməliyyat uğurlu olarsa təsdiq mesajı görünəcək.</li>
+      </ol>
+
+      <div class="note warning">
+        <strong>⚠️ Şifrə tələbləri</strong>
+        Şifrəniz ən azı 6 simvoldan ibarət olmalıdır. Güclü şifrə üçün hərf, rəqəm və xüsusi simvol (<code>@#$%</code>) istifadə edin.
+      </div>
+
+      <div class="divider"></div>
+
+      <h3>Sistemdən çıxmaq:</h3>
+      <ol class="steps">
+        <li>Sol menyunun ən altındakı <strong>Çıxış</strong> bağlantısına basın.</li>
+        <li>Sistem sizi avtomatik çıxarır və giriş səhifəsinə yönləndirir.</li>
+      </ol>
+
+      <div class="note success">
+        <strong>✅ Tövsiyə</strong>
+        İşiniz bitdikdə həmişə <strong>Çıxış</strong> edin — xüsusilə ortaq kompüter istifadə edərkən. Bu, hesabınızın başqaları tərəfindən istifadə edilməsinin qarşısını alır.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<footer>
+  &copy; 2026 DMS — Sənəd İdarəetmə Sistemi &nbsp;|&nbsp; Problemlər üçün müraciət edin: <strong>10-195</strong>
+</footer>
+
+</body>
+</html>
