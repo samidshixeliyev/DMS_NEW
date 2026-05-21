@@ -637,7 +637,8 @@
                 + '<tr><th>Əsas icraçı</th><td>' + (data.main_executors && data.main_executors.length ? data.main_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small class="text-muted">(' + escapeHtml(e.department) + ')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
                 + '<tr><th>Digər icraçı</th><td>' + (data.helper_executors && data.helper_executors.length ? data.helper_executors.map(function(e){ return escapeHtml(e.name) + (e.department ? ' <small class="text-muted">(' + escapeHtml(e.department) + ')</small>' : ''); }).join('<br>') : '-') + '</td></tr>'
                 + (data.task_number ? '<tr><th>Qeyd</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_number) + '</td></tr>' : '')
-                + '<tr><th>Tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.task_description || '-') + '</td></tr>'
+                + '<tr><th>Tapşırıq</th><td style="white-space:pre-wrap">' + escapeHtml(data.global_task_description || '-') + '</td></tr>'
+                + (data.task_description && data.task_description !== data.global_task_description ? '<tr><th>Fərdi tapşırıq</th><td><div class="p-2 rounded" style="background:#f0f9ff;white-space:pre-wrap;border-left:3px solid #0284c7"><i class="bi bi-list-task me-1 text-info"></i>' + escapeHtml(data.task_description) + '</div></td></tr>' : '')
                 + '<tr><th>İcra müddəti</th><td>' + escapeHtml(data.execution_deadline || '-') + '</td></tr>'
                 + '<tr><th>Sübut sənəd</th><td>' + (data.proof_required ? '<span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Məcburidir</span>' : '<span class="badge bg-secondary">İxtiyari</span>') + '</td></tr>'
                 + '</table>'

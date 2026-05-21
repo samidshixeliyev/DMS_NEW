@@ -92,10 +92,19 @@ class TaskNotificationService
         }
 
         // Find active users in those departments who have an email address.
+        // Two cases:
+        //   1. users.department_id is set directly (managers, admin-type users)
+        //   2. executor-role users whose department lives on the executors table,
+        //      not on users.department_id — matched via the executor relationship.
         $users = User::active()
-            ->whereIn('department_id', $departmentIds)
             ->whereNotNull('email')
             ->where('email', '!=', '')
+            ->where(function ($q) use ($departmentIds) {
+                $q->whereIn('department_id', $departmentIds)
+                  ->orWhereHas('executor', function ($eq) use ($departmentIds) {
+                      $eq->whereIn('department_id', $departmentIds);
+                  });
+            })
             ->get();
 
         $total      = $users->count();

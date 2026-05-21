@@ -109,7 +109,7 @@ class UserController extends Controller
             'surname'  => 'required|string|max:255',
             'email'    => 'nullable|email|max:255|unique:users,email',
             'username' => 'required|string|max:255|unique:users,username',
-            'password' => 'required|string|min:6|confirmed',
+            'password' => ['required', 'string', 'min:8', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*[^a-zA-Z0-9])/', 'confirmed'],
             'user_role' => 'required|in:admin,manager,user,executor',
             'executor_id' => $request->input('user_role') === 'manager'
                 ? 'required|exists:executors,id'
@@ -117,10 +117,13 @@ class UserController extends Controller
             'department_id' => $request->input('user_role') === 'manager'
                 ? 'required|exists:departments,id'
                 : 'nullable|exists:departments,id',
+        ], [
+            'password.min'   => 'Şifrə ən azı 8 simvol olmalıdır.',
+            'password.regex' => 'Şifrə böyük hərf, kiçik hərf və xüsusi simvol içərməlidir.',
         ]);
 
         $validated['password']              = Hash::make($validated['password']);
-        $validated['force_password_change'] = true; // user must change password on first login
+        $validated['force_password_change'] = $request->boolean('force_password_change', true);
 
         // executor_id is only meaningful for executor and manager roles
         if (!in_array($validated['user_role'], ['executor', 'manager'])) {
@@ -167,16 +170,17 @@ class UserController extends Controller
     {
         $executors = Executor::with('department')->active()->get();
         return response()->json([
-            'id'            => $user->id,
-            'name'          => $user->name,
-            'surname'       => $user->surname,
-            'email'         => $user->email,
-            'username'      => $user->username,
-            'user_role'     => $user->user_role,
-            'executor_id'   => $user->executor_id,
-            'department_id' => $user->department_id,
-            'departments'   => \App\Models\Department::active()->get(),
-            'executors'     => $executors,
+            'id'                   => $user->id,
+            'name'                 => $user->name,
+            'surname'              => $user->surname,
+            'email'                => $user->email,
+            'username'             => $user->username,
+            'user_role'            => $user->user_role,
+            'executor_id'          => $user->executor_id,
+            'department_id'        => $user->department_id,
+            'force_password_change' => (bool) $user->force_password_change,
+            'departments'          => \App\Models\Department::active()->get(),
+            'executors'            => $executors,
         ]);
     }
 
@@ -187,7 +191,7 @@ class UserController extends Controller
             'surname'  => 'required|string|max:255',
             'email'    => ['nullable', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
-            'password' => 'nullable|string|min:6|confirmed',
+            'password' => ['nullable', 'string', 'min:8', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*[^a-zA-Z0-9])/', 'confirmed'],
             'user_role' => 'required|in:admin,manager,user,executor',
             'executor_id' => $request->input('user_role') === 'manager'
                 ? 'required|exists:executors,id'
@@ -195,6 +199,9 @@ class UserController extends Controller
             'department_id' => $request->input('user_role') === 'manager'
                 ? 'required|exists:departments,id'
                 : 'nullable|exists:departments,id',
+        ], [
+            'password.min'   => 'Şifrə ən azı 8 simvol olmalıdır.',
+            'password.regex' => 'Şifrə böyük hərf, kiçik hərf və xüsusi simvol içərməlidir.',
         ]);
 
         if (!empty($validated['password'])) {
@@ -202,6 +209,8 @@ class UserController extends Controller
         } else {
             unset($validated['password']);
         }
+
+        $validated['force_password_change'] = $request->boolean('force_password_change');
 
         // executor_id is only meaningful for executor and manager roles
         if (!in_array($validated['user_role'], ['executor', 'manager'])) {
@@ -240,10 +249,11 @@ class UserController extends Controller
     public function forceChangePassword(Request $request)
     {
         $request->validate([
-            'password' => 'required|string|min:6|confirmed',
+            'password' => ['required', 'string', 'min:8', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*[^a-zA-Z0-9])/', 'confirmed'],
         ], [
             'password.required'  => 'Yeni şifrə mütləqdir.',
-            'password.min'       => 'Şifrə ən azı 6 simvol olmalıdır.',
+            'password.min'       => 'Şifrə ən azı 8 simvol olmalıdır.',
+            'password.regex'     => 'Şifrə böyük hərf, kiçik hərf və xüsusi simvol içərməlidir.',
             'password.confirmed' => 'Şifrə təkrarı uyğun gəlmir.',
         ]);
 
@@ -264,11 +274,12 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'current_password' => 'required|string',
-            'password' => 'required|string|min:6|confirmed',
+            'password' => ['required', 'string', 'min:8', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*[^a-zA-Z0-9])/', 'confirmed'],
         ], [
             'current_password.required' => 'Cari şifrə mütləqdir.',
-            'password.required' => 'Yeni şifrə mütləqdir.',
-            'password.min' => 'Yeni şifrə ən azı 6 simvol olmalıdır.',
+            'password.required'  => 'Yeni şifrə mütləqdir.',
+            'password.min'       => 'Yeni şifrə ən azı 8 simvol olmalıdır.',
+            'password.regex'     => 'Yeni şifrə böyük hərf, kiçik hərf və xüsusi simvol içərməlidir.',
             'password.confirmed' => 'Şifrə təkrarı uyğun gəlmir.',
         ]);
 

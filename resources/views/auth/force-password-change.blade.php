@@ -66,7 +66,7 @@
                 <label class="form-label fw-semibold">Yeni şifrə</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                    <input type="password" name="password" class="form-control" placeholder="Ən azı 6 simvol" required autofocus>
+                    <input type="password" name="password" class="form-control" placeholder="Ən azı 8 simvol, böyük/kiçik hərf, xüsusi simvol" required autofocus>
                 </div>
             </div>
             <div class="mb-4">

@@ -90,11 +90,20 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Şifrə <span class="text-danger">*</span></label>
-                                <input type="password" name="password" class="form-control" required>
+                                <input type="password" name="password" class="form-control" required placeholder="Ən azı 8 simvol">
+                                <small class="text-muted">Böyük hərf, kiçik hərf, xüsusi simvol tələb olunur</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Şifrə təkrarı <span class="text-danger">*</span></label>
                                 <input type="password" name="password_confirmation" class="form-control" required>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="force_password_change" id="create_force_password_change" value="1" checked>
+                                    <label class="form-check-label" for="create_force_password_change">
+                                        İlk girişdə şifrə dəyişikliyi tələb olunsun
+                                    </label>
+                                </div>
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Rol <span class="text-danger">*</span></label>
@@ -184,13 +193,21 @@
                                 <div id="edit_username_feedback" class="form-text"></div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Yeni şifrə <small class="text-muted">(boş buraxın dəyişməmək
-                                        üçün)</small></label>
-                                <input type="password" name="password" class="form-control">
+                                <label class="form-label">Yeni şifrə <small class="text-muted">(boş buraxın dəyişməmək üçün)</small></label>
+                                <input type="password" name="password" class="form-control" placeholder="Ən azı 8 simvol">
+                                <small class="text-muted">Böyük hərf, kiçik hərf, xüsusi simvol tələb olunur</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Şifrə təkrarı</label>
                                 <input type="password" name="password_confirmation" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="force_password_change" id="edit_force_password_change" value="1">
+                                    <label class="form-check-label" for="edit_force_password_change">
+                                        Növbəti girişdə şifrə dəyişikliyi tələb olunsun
+                                    </label>
+                                </div>
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Rol <span class="text-danger">*</span></label>
@@ -531,6 +548,7 @@
             document.getElementById('edit_email').value   = data.email   || '';
             document.getElementById('edit_username').value = data.username || '';
             document.getElementById('edit_user_role').value = data.user_role || 'user';
+            document.getElementById('edit_force_password_change').checked = !!data.force_password_change;
             var deptSelect = document.getElementById('edit_department_id');
             deptSelect.innerHTML = '<option value="">Seç</option>';
             if (data.departments && Array.isArray(data.departments)) {
