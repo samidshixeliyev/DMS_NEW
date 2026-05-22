@@ -109,7 +109,7 @@
 <div class="card mb-3">
     <div class="card-body py-2">
         <div class="row align-items-center">
-            <div class="col-auto"><strong style="font-size:0.82rem;"><i class="bi bi-funnel me-1"></i> Filtr:</strong></div>
+            <div class="col-auto"><strong style="font-size:0.82rem;"><i class="bi bi-funnel me-1"></i> Filter:</strong></div>
             <div class="col-md-3">
                 <select id="filterDepartment" class="form-select form-select-sm">
                     <option value="">Bütün idarələr</option>

@@ -40,7 +40,7 @@
                 @endif
             </div>
 
-            <p>Sistemə daxil olun və tapşırığı icra edin.</p>
+            <p> Sistemə daxil olun və tapşırığı icra edin. </p>
         </div>
         <div class="footer">
             <p>Bu məktub {{ config('app.name') }} sistemi tərəfindən avtomatik olaraq göndərilmişdir.</p>
