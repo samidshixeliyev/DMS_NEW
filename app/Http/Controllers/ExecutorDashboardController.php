@@ -13,9 +13,14 @@ use Illuminate\Support\Str;
 
 class ExecutorDashboardController extends Controller
 {
+    private function getIcraOlunubNoteIds(): array
+    {
+        return ExecutionNote::icraOlunubIds();
+    }
+
     private function isIcraOlunubNote(?int $noteId): bool
     {
-        return $noteId && in_array($noteId, ExecutionNote::icraOlunubIds(), true);
+        return $noteId && in_array($noteId, $this->getIcraOlunubNoteIds(), true);
     }
 
     private function isQismenIcraNote(int $noteId): bool
