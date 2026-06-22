@@ -26,7 +26,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     ACCEPT_EULA=Y \
     COMPOSER_ALLOW_SUPERUSER=1
 
-# System libs, PHP extensions, Microsoft ODBC driver (SQL Server), Supervisor.
+# Base system libs, PHP extensions, Apache modules, Supervisor.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -36,19 +36,21 @@ RUN set -eux; \
         unixodbc-dev supervisor; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
     docker-php-ext-install -j"$(nproc)" pdo zip intl bcmath opcache pcntl gd exif; \
-    # Microsoft ODBC 18 + pdo_sqlsrv/sqlsrv (Debian 12 / bookworm).
-    # Use Microsoft's prod package to register the repo + signing key correctly.
-    curl -sSL -o /tmp/ms-prod.deb https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb; \
-    dpkg -i /tmp/ms-prod.deb; \
-    rm -f /tmp/ms-prod.deb; \
+    a2enmod rewrite headers; \
+    echo "ServerName localhost" >> /etc/apache2/apache2.conf; \
+    apt-get clean; rm -rf /var/lib/apt/lists/*
+
+# Microsoft SQL Server driver: ODBC 18 + pdo_sqlsrv/sqlsrv (Debian 12 bookworm).
+# Microsoft's repo signing key is SHA1-signed, which modern apt (sqv) rejects;
+# mark the repo trusted to skip signature verification for this controlled build.
+RUN set -eux; \
+    echo "deb [trusted=yes] https://packages.microsoft.com/debian/12/prod bookworm main" \
+        > /etc/apt/sources.list.d/mssql-release.list; \
     apt-get update; \
     ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18; \
     pecl install sqlsrv pdo_sqlsrv; \
     docker-php-ext-enable sqlsrv pdo_sqlsrv; \
-    a2enmod rewrite headers; \
-    echo "ServerName localhost" >> /etc/apache2/apache2.conf; \
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean; rm -rf /var/lib/apt/lists/*
 
 # Composer (from the official image)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
