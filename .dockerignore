@@ -1,0 +1,33 @@
+.git
+.gitignore
+.github
+node_modules
+vendor
+
+# Secrets / local env (env is injected by compose at runtime)
+.env
+.env.*
+!.env.docker.example
+
+# Runtime / generated
+storage/app/public/*
+storage/app/private/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*
+public/build
+public/hot
+
+# Misc / not needed in the image
+*.tar.gz
+deploy
+guide_screenshots
+screenshot_guide.cjs
+*.docx
+İSTİFADƏÇİ_TƏLIMATNAMƏ.html
+tests
+phpunit.xml
+README.md
+CHANGELOG.md

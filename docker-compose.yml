@@ -1,0 +1,81 @@
+# DMS — single application container (Apache + PHP + scheduler + queue worker).
+#
+# Values are NOT stored here: every variable is a key that resolves from a
+# separate env file via ${VAR} substitution. Provide it with:
+#     docker compose --env-file .env.docker up -d --build
+#
+# Your host nginx proxies to the published port (APP_PORT, default 8080).
+# MinIO, DB and mail are all external and configured purely through env vars.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dms-app:latest
+    container_name: dms_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      # --- App ---
+      APP_NAME: ${APP_NAME}
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG}
+      APP_URL: ${APP_URL}
+      APP_LOCALE: ${APP_LOCALE}
+      APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE}
+      APP_FAKER_LOCALE: ${APP_FAKER_LOCALE}
+      APP_MAINTENANCE_DRIVER: ${APP_MAINTENANCE_DRIVER}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
+      # --- Logging ---
+      LOG_CHANNEL: ${LOG_CHANNEL}
+      LOG_STACK: ${LOG_STACK}
+      LOG_DEPRECATIONS_CHANNEL: ${LOG_DEPRECATIONS_CHANNEL}
+      LOG_LEVEL: ${LOG_LEVEL}
+      # --- Database (SQL Server) ---
+      DB_CONNECTION: ${DB_CONNECTION}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # --- Session / cache / queue / broadcast ---
+      SESSION_DRIVER: ${SESSION_DRIVER}
+      SESSION_LIFETIME: ${SESSION_LIFETIME}
+      SESSION_ENCRYPT: ${SESSION_ENCRYPT}
+      SESSION_PATH: ${SESSION_PATH}
+      SESSION_DOMAIN: ${SESSION_DOMAIN}
+      BROADCAST_CONNECTION: ${BROADCAST_CONNECTION}
+      CACHE_STORE: ${CACHE_STORE}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION}
+      # --- Filesystems / MinIO ---
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK}
+      ATTACHMENT_DISK: ${ATTACHMENT_DISK}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_REGION: ${MINIO_REGION}
+      MINIO_SSL_CA: ${MINIO_SSL_CA}
+      # --- Mail ---
+      MAIL_MAILER: ${MAIL_MAILER}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_SCHEME: ${MAIL_SCHEME}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
+      # --- Frontend ---
+      VITE_APP_NAME: ${VITE_APP_NAME}
+    volumes:
+      # Persist logs / sessions / temp files across restarts.
+      - dms_storage:/var/www/html/storage
+      # If MinIO uses a self-signed / internal CA over HTTPS, mount the PEM and
+      # set MINIO_SSL_CA to the in-container path below:
+      # - ./certs/minio-ca.pem:/etc/ssl/minio/minio-ca.pem:ro
+
+volumes:
+  dms_storage:

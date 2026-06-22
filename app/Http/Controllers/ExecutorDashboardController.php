@@ -573,20 +573,16 @@ class ExecutorDashboardController extends Controller
         $this->authorizeAttachmentAccess($attachment);
 
         $disk = $this->attachmentDisk($attachment);
-        if ($disk !== 'local') {
-            abort_unless(Storage::disk($disk)->exists($attachment->file_path), 404, 'Fayl tapılmadı.');
-            return Storage::disk($disk)->download($attachment->file_path, $attachment->original_name);
-        }
-
-        return response()->download($this->getLocalAttachmentPath($attachment), $attachment->original_name);
+        abort_unless(Storage::disk($disk)->exists($attachment->file_path), 404, 'Fayl tapılmadı.');
+        return Storage::disk($disk)->download($attachment->file_path, $attachment->original_name);
     }
 
     public function previewAttachment(ExecutionAttachment $attachment)
     {
         $this->authorizeAttachmentAccess($attachment);
 
-        // Resolve a real local filesystem path. For remote disks (MinIO) the file
-        // is pulled into a temp file ($isTemp = true) that is cleaned up after send.
+        // The file lives on MinIO; pull it into a temp local file ($isTemp = true)
+        // for serving / .doc conversion. The temp file is removed after send.
         [$fullPath, $isTemp] = $this->materializeAttachment($attachment);
         $ext = strtolower(pathinfo($attachment->original_name, PATHINFO_EXTENSION));
 
@@ -623,20 +619,10 @@ class ExecutorDashboardController extends Controller
     {
         $log->load('attachments');
         foreach ($log->attachments as $attachment) {
-            $disk = $this->attachmentDisk($attachment);
-            if ($disk === 'local') {
-                foreach ([
-                    storage_path('app/private/' . $attachment->file_path),
-                    storage_path('app/' . $attachment->file_path),
-                ] as $path) {
-                    if (file_exists($path)) @unlink($path);
-                }
-            } else {
-                try {
-                    Storage::disk($disk)->delete($attachment->file_path);
-                } catch (\Throwable $e) {
-                    // Ignore remote-delete failures; the DB row is still removed below.
-                }
+            try {
+                Storage::disk($this->attachmentDisk($attachment))->delete($attachment->file_path);
+            } catch (\Throwable $e) {
+                // Ignore remote-delete failures; the DB row is still removed below.
             }
             $attachment->delete();
         }
@@ -644,41 +630,21 @@ class ExecutorDashboardController extends Controller
     }
 
     /**
-     * The filesystem disk an attachment lives on. Legacy rows without a disk
-     * value fall back to 'local'.
+     * The filesystem disk an attachment lives on. Falls back to the configured
+     * attachment disk (MinIO) for rows without an explicit value.
      */
     private function attachmentDisk(ExecutionAttachment $attachment): string
     {
-        return $attachment->disk ?: 'local';
+        return $attachment->disk ?: config('filesystems.attachment_disk', 'minio');
     }
 
     /**
-     * Resolve a legacy local attachment to a real filesystem path, checking
-     * both the private disk root and the historical app/ fallback location.
-     */
-    private function getLocalAttachmentPath(ExecutionAttachment $attachment): string
-    {
-        foreach ([
-            storage_path('app/private/' . $attachment->file_path),
-            storage_path('app/' . $attachment->file_path),
-        ] as $path) {
-            if (file_exists($path)) return $path;
-        }
-        abort(404, 'Fayl tapılmadı.');
-    }
-
-    /**
-     * Return [localPath, isTemp] for an attachment. Local files resolve to their
-     * real path (isTemp = false). Remote-disk files (MinIO) are streamed into a
-     * temp file the caller must delete after use (isTemp = true).
+     * Return [localPath, isTemp] for an attachment. The file is streamed from its
+     * disk (MinIO) into a temp local file that the caller must delete after use.
      */
     private function materializeAttachment(ExecutionAttachment $attachment): array
     {
         $disk = $this->attachmentDisk($attachment);
-        if ($disk === 'local') {
-            return [$this->getLocalAttachmentPath($attachment), false];
-        }
-
         abort_unless(Storage::disk($disk)->exists($attachment->file_path), 404, 'Fayl tapılmadı.');
 
         $tmp = storage_path('app/private/tmp_' . uniqid() . '_' . basename($attachment->file_path));
