@@ -48,7 +48,8 @@ RUN set -eux; \
         > /etc/apt/sources.list.d/mssql-release.list; \
     apt-get update; \
     ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18; \
-    pecl install sqlsrv pdo_sqlsrv; \
+    # Pin to 5.12.0 — the latest sqlsrv requires PHP >= 8.3; 5.12.0 supports 8.2.
+    pecl install sqlsrv-5.12.0 pdo_sqlsrv-5.12.0; \
     docker-php-ext-enable sqlsrv pdo_sqlsrv; \
     apt-get clean; rm -rf /var/lib/apt/lists/*
 
