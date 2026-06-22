@@ -36,14 +36,13 @@ RUN set -eux; \
         unixodbc-dev supervisor; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
     docker-php-ext-install -j"$(nproc)" pdo zip intl bcmath opcache pcntl gd exif; \
-    # Microsoft ODBC 18 + pdo_sqlsrv/sqlsrv (Debian 12 / bookworm)
-    curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
-        | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg; \
-    curl -sSL https://packages.microsoft.com/config/debian/12/prod.list \
-        | sed 's#https://#[signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://#' \
-        > /etc/apt/sources.list.d/mssql-release.list; \
+    # Microsoft ODBC 18 + pdo_sqlsrv/sqlsrv (Debian 12 / bookworm).
+    # Use Microsoft's prod package to register the repo + signing key correctly.
+    curl -sSL -o /tmp/ms-prod.deb https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb; \
+    dpkg -i /tmp/ms-prod.deb; \
+    rm -f /tmp/ms-prod.deb; \
     apt-get update; \
-    apt-get install -y --no-install-recommends msodbcsql18; \
+    ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18; \
     pecl install sqlsrv pdo_sqlsrv; \
     docker-php-ext-enable sqlsrv pdo_sqlsrv; \
     a2enmod rewrite headers; \
