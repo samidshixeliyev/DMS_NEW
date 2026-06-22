@@ -6,6 +6,23 @@
 set -e
 cd /var/www/html
 
+# Trust extra CA certificates (e.g. internal SMTP/mail CA, MinIO CA). Mount them
+# into the directory below (any *.crt / *.pem). They are installed into the system
+# trust store so PHP, Symfony Mailer and TLS clients trust them — no code change.
+CA_SRC="${EXTRA_CA_DIR:-/certs}"
+if [ -d "$CA_SRC" ]; then
+    installed=0
+    for f in "$CA_SRC"/*.crt "$CA_SRC"/*.pem; do
+        [ -f "$f" ] || continue
+        cp "$f" "/usr/local/share/ca-certificates/$(basename "${f%.*}").crt"
+        installed=1
+    done
+    if [ "$installed" = 1 ]; then
+        update-ca-certificates || true
+        echo "Installed extra CA certificate(s) from $CA_SRC into the system trust store."
+    fi
+fi
+
 # Ensure writable runtime dirs exist (a mounted storage volume starts empty).
 mkdir -p \
     storage/app/private \

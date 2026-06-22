@@ -73,9 +73,10 @@ services:
     volumes:
       # Persist logs / sessions / temp files across restarts.
       - dms_storage:/var/www/html/storage
-      # If MinIO uses a self-signed / internal CA over HTTPS, mount the PEM and
-      # set MINIO_SSL_CA to the in-container path below:
-      # - ./certs/minio-ca.pem:/etc/ssl/minio/minio-ca.pem:ro
+      # Trusted CA certificates: put your internal MAIL (SMTP) CA and/or MinIO CA
+      # here as .crt/.pem. The entrypoint installs them into the system trust
+      # store at startup, so mail TLS and MinIO HTTPS work with internal CAs.
+      - ./certs:/certs:ro
 
 volumes:
   dms_storage:

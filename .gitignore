@@ -23,3 +23,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Docker: mounted CA certs (mail/MinIO) - never commit real certs
+certs/*
+!certs/.gitkeep

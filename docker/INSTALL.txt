@@ -1,0 +1,120 @@
+==============================================================================
+DMS — Docker installation
+==============================================================================
+
+The app runs as ONE container: Apache + PHP 8.2 (serving public/), plus the
+Laravel scheduler and a queue worker (via Supervisor). It connects to EXTERNAL
+SQL Server, MinIO and SMTP — all configured through environment variables.
+
+Your own (host) nginx sits in front and proxies to the published port. The
+image ships NO nginx.
+
+The image is built ONCE on a machine with Docker + internet, exported as a tar,
+then loaded on the (offline) server.
+
+------------------------------------------------------------------------------
+A. BUILD (on a machine WITH Docker + internet)
+------------------------------------------------------------------------------
+  cd <project root>
+  ./docker/build-image.sh
+      -> builds image "dms-app:latest"
+      -> writes dms-app.tar.gz  (a portable image archive)
+
+  (manual equivalent:)
+      docker build -t dms-app:latest .
+      docker save dms-app:latest | gzip > dms-app.tar.gz
+
+------------------------------------------------------------------------------
+B. TRANSFER TO THE SERVER
+------------------------------------------------------------------------------
+  Copy these to the server (e.g. via USB / scp):
+      dms-app.tar.gz
+      docker-compose.yml
+      .env.docker            (your filled-in copy of .env.docker.example)
+      certs/                 (folder with your internal CA cert(s), if any)
+
+------------------------------------------------------------------------------
+C. LOAD THE IMAGE (on the server)
+------------------------------------------------------------------------------
+  docker load -i dms-app.tar.gz
+      -> loads dms-app:latest (no internet needed)
+
+------------------------------------------------------------------------------
+D. PREPARE ENV + CERTS (on the server)
+------------------------------------------------------------------------------
+  1) cp .env.docker.example .env.docker   (if you didn't already) and fill in:
+        - APP_KEY      (generate once: php artisan key:generate --show)
+        - DB_*         (SQL Server host/db/user/pass)
+        - MINIO_*      (endpoint/keys/bucket)
+        - MAIL_*       (smtp host/user/pass/from)
+     Keep .env.docker OUT of git — it holds secrets.
+
+  2) Certificates (mail + MinIO over HTTPS with internal/self-signed CA):
+        mkdir -p certs
+        # copy the CA cert(s) here, e.g.:
+        #   certs/mail-ca.crt     (your SMTP server's CA)
+        #   certs/minio-ca.pem    (your MinIO CA)
+     The container installs everything in ./certs into its system trust store
+     at startup, so MAIL TLS and MinIO HTTPS both trust your internal CA.
+     (No app/code setting is needed for the mail cert — it is trusted at the OS
+     level. The code's config/mail.php is stock and uses the system trust store.)
+
+     Optional: instead of the OS trust store you may point the app at the MinIO
+     CA explicitly with MINIO_SSL_CA=/certs/minio-ca.pem — but if the CA is in
+     ./certs it is already trusted and MINIO_SSL_CA can stay empty.
+
+------------------------------------------------------------------------------
+E. DATABASE PREREQUISITES (run manually in SQL Server)
+------------------------------------------------------------------------------
+  - The schema/tables must exist (you manage migrations/DDL manually).
+  - SESSION_DRIVER/CACHE_STORE/QUEUE_CONNECTION = database, so these tables
+    must exist: sessions, cache, cache_locks, jobs, job_batches, failed_jobs.
+  - For attachments: the execution_attachments table needs the 'disk' column:
+        ALTER TABLE execution_attachments ADD disk VARCHAR(32) NULL;
+
+------------------------------------------------------------------------------
+F. RUN
+------------------------------------------------------------------------------
+  docker compose --env-file .env.docker up -d
+
+  Check it:
+      docker ps
+      docker logs -f dms_app
+
+  The container listens on the host port APP_PORT (default 8080).
+
+------------------------------------------------------------------------------
+G. HOST NGINX (your native nginx — example)
+------------------------------------------------------------------------------
+  server {
+      listen 443 ssl;
+      server_name dms.example.az;
+      # ssl_certificate / ssl_certificate_key ...
+
+      client_max_body_size 25m;   # allow attachment uploads
+
+      location / {
+          proxy_pass         http://127.0.0.1:8080;
+          proxy_set_header   Host              $host;
+          proxy_set_header   X-Real-IP         $remote_addr;
+          proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+          proxy_set_header   X-Forwarded-Proto $scheme;
+      }
+  }
+
+------------------------------------------------------------------------------
+H. UPDATING TO A NEW IMAGE LATER
+------------------------------------------------------------------------------
+  Rebuild (step A) -> transfer -> docker load -i dms-app.tar.gz
+  docker compose --env-file .env.docker up -d   (recreates the container)
+
+------------------------------------------------------------------------------
+NOTES
+------------------------------------------------------------------------------
+  - Scheduler runs in-container: deadline-reminders fire dailyAt 08:00.
+    Confirm the container timezone matches your expectation (set TZ if needed).
+  - The queue worker is included but idle until jobs are dispatched.
+  - APP_DEBUG=false and APP_ENV=production for real deployments.
+  - To change env values: edit .env.docker and re-run `up -d` (container
+    re-reads env and rebuilds Laravel caches on start).
+==============================================================================
