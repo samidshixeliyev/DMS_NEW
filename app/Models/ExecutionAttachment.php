@@ -14,6 +14,7 @@ class ExecutionAttachment extends Model
         'user_id',
         'status_log_id',
         'file_path',
+        'disk',
         'original_name',
         'mime_type',
         'file_size',

@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Attachment Disk
+    |--------------------------------------------------------------------------
+    |
+    | The disk that NEW execution attachments are written to. During the
+    | migration to MinIO this is set to 'minio'. Existing rows keep their own
+    | 'disk' value (defaulting to 'local'), so old files are still read from
+    | local storage while new uploads go to MinIO.
+    |
+    */
+
+    'attachment_disk' => env('ATTACHMENT_DISK', 'minio'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -57,6 +71,27 @@ return [
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
+            'report' => false,
+        ],
+
+        // MinIO (S3-compatible object storage) used for execution attachments.
+        'minio' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('MINIO_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('MINIO_BUCKET', 'dms'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://localhost:9000'),
+            // MinIO requires path-style addressing: https://host:9000/bucket/key
+            'use_path_style_endpoint' => true,
+            // TLS verification for the underlying AWS/Guzzle client:
+            //   MINIO_SSL_CA = /path/to/ca.pem  -> verify against this CA/cert bundle (HTTPS w/ self-signed or internal CA)
+            //   MINIO_SSL_CA unset             -> verify against the system CA bundle (true)
+            //   MINIO_SSL_CA = false           -> disable verification (NOT recommended)
+            'http' => [
+                'verify' => env('MINIO_SSL_CA', true),
+            ],
+            'throw' => true,
             'report' => false,
         ],
 

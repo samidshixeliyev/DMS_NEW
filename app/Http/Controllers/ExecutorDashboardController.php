@@ -485,14 +485,16 @@ class ExecutorDashboardController extends Controller
         ]);
 
         if ($request->hasFile('attachments')) {
+            $disk = config('filesystems.attachment_disk', 'minio');
             foreach ($request->file('attachments') as $file) {
                 if (!$file || !$file->isValid()) continue;
-                $path = $file->store('execution-attachments/' . $legalAct->id, 'local');
+                $path = $file->store('execution-attachments/' . $legalAct->id, $disk);
                 ExecutionAttachment::create([
                     'legal_act_id'  => $legalAct->id,
                     'user_id'       => $actingUserId,
                     'status_log_id' => $statusLog->id,
                     'file_path'     => $path,
+                    'disk'          => $disk,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type'     => $file->getClientMimeType(),
                     'file_size'     => $file->getSize(),
@@ -569,23 +571,33 @@ class ExecutorDashboardController extends Controller
     public function downloadAttachment(ExecutionAttachment $attachment)
     {
         $this->authorizeAttachmentAccess($attachment);
-        return response()->download($this->getAttachmentPath($attachment), $attachment->original_name);
+
+        $disk = $this->attachmentDisk($attachment);
+        if ($disk !== 'local') {
+            abort_unless(Storage::disk($disk)->exists($attachment->file_path), 404, 'Fayl tapılmadı.');
+            return Storage::disk($disk)->download($attachment->file_path, $attachment->original_name);
+        }
+
+        return response()->download($this->getLocalAttachmentPath($attachment), $attachment->original_name);
     }
 
     public function previewAttachment(ExecutionAttachment $attachment)
     {
         $this->authorizeAttachmentAccess($attachment);
-        $fullPath = $this->getAttachmentPath($attachment);
+
+        // Resolve a real local filesystem path. For remote disks (MinIO) the file
+        // is pulled into a temp file ($isTemp = true) that is cleaned up after send.
+        [$fullPath, $isTemp] = $this->materializeAttachment($attachment);
         $ext = strtolower(pathinfo($attachment->original_name, PATHINFO_EXTENSION));
 
         if (in_array($ext, ['jpg', 'jpeg', 'png'])) {
-            return response()->file($fullPath, ['Content-Type' => $ext === 'png' ? 'image/png' : 'image/jpeg', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"']);
+            return response()->file($fullPath, ['Content-Type' => $ext === 'png' ? 'image/png' : 'image/jpeg', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"'])->deleteFileAfterSend($isTemp);
         }
         if ($ext === 'pdf') {
-            return response()->file($fullPath, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"']);
+            return response()->file($fullPath, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"'])->deleteFileAfterSend($isTemp);
         }
         if ($ext === 'docx') {
-            return response()->file($fullPath, ['Content-Type' => 'application/octet-stream', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"']);
+            return response()->file($fullPath, ['Content-Type' => 'application/octet-stream', 'Content-Disposition' => 'inline; filename="' . $attachment->original_name . '"'])->deleteFileAfterSend($isTemp);
         }
         if ($ext === 'doc') {
             try {
@@ -593,12 +605,14 @@ class ExecutorDashboardController extends Controller
                 $tempPath = storage_path('app/private/temp_preview_' . uniqid() . '.docx');
                 $writer   = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
                 $writer->save($tempPath);
+                if ($isTemp) @unlink($fullPath);
                 return response()->file($tempPath, ['Content-Type' => 'application/octet-stream', 'Content-Disposition' => 'inline; filename="preview.docx"'])->deleteFileAfterSend(true);
             } catch (\Exception $e) {
+                if ($isTemp) @unlink($fullPath);
                 return response()->json(['error' => true, 'message' => '.doc çevrilə bilmədi: ' . $e->getMessage()], 422);
             }
         }
-        return response()->download($fullPath, $attachment->original_name);
+        return response()->download($fullPath, $attachment->original_name)->deleteFileAfterSend($isTemp);
     }
 
     // -------------------------------------------------------------------------
@@ -609,15 +623,70 @@ class ExecutorDashboardController extends Controller
     {
         $log->load('attachments');
         foreach ($log->attachments as $attachment) {
-            foreach ([
-                storage_path('app/private/' . $attachment->file_path),
-                storage_path('app/' . $attachment->file_path),
-            ] as $path) {
-                if (file_exists($path)) @unlink($path);
+            $disk = $this->attachmentDisk($attachment);
+            if ($disk === 'local') {
+                foreach ([
+                    storage_path('app/private/' . $attachment->file_path),
+                    storage_path('app/' . $attachment->file_path),
+                ] as $path) {
+                    if (file_exists($path)) @unlink($path);
+                }
+            } else {
+                try {
+                    Storage::disk($disk)->delete($attachment->file_path);
+                } catch (\Throwable $e) {
+                    // Ignore remote-delete failures; the DB row is still removed below.
+                }
             }
             $attachment->delete();
         }
         $log->delete();
+    }
+
+    /**
+     * The filesystem disk an attachment lives on. Legacy rows without a disk
+     * value fall back to 'local'.
+     */
+    private function attachmentDisk(ExecutionAttachment $attachment): string
+    {
+        return $attachment->disk ?: 'local';
+    }
+
+    /**
+     * Resolve a legacy local attachment to a real filesystem path, checking
+     * both the private disk root and the historical app/ fallback location.
+     */
+    private function getLocalAttachmentPath(ExecutionAttachment $attachment): string
+    {
+        foreach ([
+            storage_path('app/private/' . $attachment->file_path),
+            storage_path('app/' . $attachment->file_path),
+        ] as $path) {
+            if (file_exists($path)) return $path;
+        }
+        abort(404, 'Fayl tapılmadı.');
+    }
+
+    /**
+     * Return [localPath, isTemp] for an attachment. Local files resolve to their
+     * real path (isTemp = false). Remote-disk files (MinIO) are streamed into a
+     * temp file the caller must delete after use (isTemp = true).
+     */
+    private function materializeAttachment(ExecutionAttachment $attachment): array
+    {
+        $disk = $this->attachmentDisk($attachment);
+        if ($disk === 'local') {
+            return [$this->getLocalAttachmentPath($attachment), false];
+        }
+
+        abort_unless(Storage::disk($disk)->exists($attachment->file_path), 404, 'Fayl tapılmadı.');
+
+        $tmp = storage_path('app/private/tmp_' . uniqid() . '_' . basename($attachment->file_path));
+        if (!is_dir(dirname($tmp))) {
+            @mkdir(dirname($tmp), 0755, true);
+        }
+        file_put_contents($tmp, Storage::disk($disk)->get($attachment->file_path));
+        return [$tmp, true];
     }
 
     /**
@@ -667,14 +736,6 @@ class ExecutorDashboardController extends Controller
         }
 
         return [];
-    }
-
-    private function getAttachmentPath(ExecutionAttachment $attachment): string
-    {
-        foreach ([storage_path('app/private/' . $attachment->file_path), storage_path('app/' . $attachment->file_path)] as $path) {
-            if (file_exists($path)) return $path;
-        }
-        abort(404, 'Fayl tapılmadı.');
     }
 
     private function authorizeAttachmentAccess(ExecutionAttachment $attachment): void
