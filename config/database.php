@@ -109,11 +109,13 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            // ODBC Driver 18 defaults to Encrypt=yes. Either trust the server cert
-            // (DB_TRUST_SERVER_CERTIFICATE=true) or install its CA in the trust
-            // store and keep verification on. Set DB_ENCRYPT=no to disable TLS.
+            // ODBC Driver 18 defaults to Encrypt=yes and VERIFIES the server cert,
+            // which breaks with self-signed certs. Default to trusting the cert so
+            // it works out of the box (set DB_TRUST_SERVER_CERTIFICATE=false to
+            // verify against a CA installed in the trust store; DB_ENCRYPT=no to
+            // disable TLS entirely).
             'encrypt' => env('DB_ENCRYPT', 'yes'),
-            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
         ],
 
     ],
