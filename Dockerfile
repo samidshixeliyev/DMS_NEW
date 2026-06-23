@@ -55,6 +55,12 @@ RUN set -eux; \
     docker-php-ext-enable sqlsrv pdo_sqlsrv; \
     apt-get clean; rm -rf /var/lib/apt/lists/*
 
+# OpenTelemetry PHP extension — provides the auto-instrumentation hooks used to
+# emit traces to an OTel Collector (via the open-telemetry/* Composer packages).
+RUN set -eux; \
+    yes '' | pecl install opentelemetry; \
+    docker-php-ext-enable opentelemetry
+
 # Composer (from the official image)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
