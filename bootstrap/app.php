@@ -11,6 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Behind a TLS-terminating reverse proxy (nginx forwards plain HTTP to the
+        // container). Trust the proxy and honour X-Forwarded-Proto/Host so Laravel
+        // generates https:// URLs — otherwise login form actions become http:// and
+        // the browser warns "the information you're about to submit is not secure".
+        $middleware->trustProxies(at: '*');
+
         // Logout is safe to exempt from CSRF: worst-case is a forced logout (no data change).
         // This prevents the 419 PAGE EXPIRED error when the user's session has already expired.
         $middleware->validateCsrfTokens(except: ['logout']);
