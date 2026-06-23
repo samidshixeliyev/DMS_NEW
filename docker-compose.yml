@@ -74,15 +74,9 @@ services:
       MAIL_SCHEME: ${MAIL_SCHEME}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME}
-      # --- OpenTelemetry (traces -> OTel Collector) ---
-      OTEL_PHP_AUTOLOAD_ENABLED: ${OTEL_PHP_AUTOLOAD_ENABLED}
-      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME}
-      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER}
-      OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER}
-      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER}
-      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
-      OTEL_PROPAGATORS: ${OTEL_PROPAGATORS}
+      # NOTE: OpenTelemetry env vars (OTEL_*) are injected by the deployment tool's
+      # PHP agent, not defined here. The image only provides the required lib
+      # (the `opentelemetry` PHP extension + open-telemetry/* packages).
       # --- Frontend ---
       VITE_APP_NAME: ${VITE_APP_NAME}
     volumes:
